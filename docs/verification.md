@@ -76,3 +76,16 @@
 - README 的测试步骤从仓库 `.cache/` 推导 SDK 和 pub 缓存路径；单元测试会先创建所需缓存目录。本地样例设置中遗留的绝对 SDK 路径已移除，该设置文件不纳入版本控制。
 - 类型检查、lint、49 个单元测试和 VSIX 打包通过；新增测试覆盖非 C 盘的 Windows 根目录及环境变量缺失。
 - 自动下载 VS Code 成功。未设置 `FLUTTER_SDK_PATH` 时，真实 Extension Host 已从 `PATH` 完成 SDK 解析，但完整 E2E 被本机已占用的 7357 服务端口与 9333 CDP 端口阻挡，未通过；没有结束占用这些端口的其他进程。
+
+## 应用调试控制台日志（2026-10-05）
+
+- 在独立 worktree 的 `feat/debug-console-logs` 分支开发，已合入远程 `878a1fd`；各实现及验证部分分别提交。
+- 复用内置 `editor-browser` 的无断点 attach 会话，以会话和浏览器绑定标识隔离生命周期。应用日志来自浏览器控制台；Flutter 编译、进程及插件诊断保留在 Output。
+- 62 个单元测试通过，覆盖连接复用、超时/失败恢复、迟到连接清理、停止重试与并发合并、父子/其他调试会话隔离以及日志事件状态转换。类型检查、lint 和 VSIX 打包通过。
+- Flutter 3.35.1 的真实点击、异步 `print` / `debugPrint` / `developer.log`、中文、多行、连续相同消息、可展开日志元数据、保存刷新、浏览器刷新、Restart、其他调试会话隔离与端口释放通过。记录：`artifacts/log-console-3.35.1.log`、`artifacts/log-console-3.35.1-checks.json`。
+- 新 VSIX 安装到隔离扩展目录后，Flutter 3.47.6 完整日志验收通过；打包安装的入口 bundle 与开发构建 SHA-256 一致。记录：`artifacts/log-console-vsix-3.47.6.log`、`artifacts/log-console-vsix-3.47.6-checks.json`、`artifacts/debug-console-vsix.png`。
+- 已安装 VSIX 的原生调试工具栏停止动作通过：活动浏览器子会话停止后，预览停止并释放 7357 端口。记录：`artifacts/log-console-toolbar-stop.log`、`artifacts/log-console-toolbar-stop.json`。
+- 已安装 VSIX 在日志会话确认连接后关闭 VS Code 窗口，服务及端口释放通过。关闭窗口会主动中断测试宿主，因此脚本核对本轮关闭标识及端口释放后报告通过。记录：`artifacts/debug-console-window-shutdown.log`、`artifacts/shutdown-marker.json`。
+- 已安装 VSIX 的原有 E2E 回归通过：CodeLens、渲染、500 ms 内请求保存刷新、编译失败恢复、Auto Save、实时配置、移动后显式重绑定、关闭及三个 Run/Stop/Restart/关闭循环、Restart 重读端口。记录：`artifacts/e2e-debug-console-vsix.log`、`artifacts/e2e-checks.json`。本轮本地循环数为 3，CI 保留 20 轮矩阵并新增日志验收步骤；尚未运行云端 CI。
+- 测试每次使用独立 VS Code 配置目录，避免复用旧布局；Flutter 3.35 的语义指针初始化需要正常按下/松开间隔，真实鼠标测试保留该间隔并等待导航完成。
+- 原生调试器在复用/停止过程中可能输出 `Invalid debug adapter`、截图失败等内部诊断；这些记录未被隐藏，验收以实际日志、会话结束、渲染和端口释放为准。插件对父会话请求隐藏工具栏，但内置调试器的子会话仍可能显示原生工具栏；不修改用户全局调试设置。本功能不提供完整 Dart 调试。

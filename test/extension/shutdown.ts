@@ -16,7 +16,7 @@ export async function shutdownTest(): Promise<void> {
   if (process.env.FLUTTER_SDK_PATH) await vscode.workspace.getConfiguration('flutterWebPreview', file).update('flutterSdkPath', process.env.FLUTTER_SDK_PATH, vscode.ConfigurationTarget.Workspace);
   await vscode.commands.executeCommand('flutterWebPreview.run', file);
   const start = Date.now();
-  while (api.getStatus().state !== 'running' || !api.getStatus().browserAvailable) {
+  while (api.getStatus().state !== 'running' || !api.getStatus().browserAvailable || !api.getStatus().logConsoleConnected) {
     if (api.getStatus().state === 'failed' || Date.now() - start > 180000) throw new Error(api.getStatus().error ?? 'Shutdown fixture startup timed out');
     await wait(100);
   }
