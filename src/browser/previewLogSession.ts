@@ -72,6 +72,7 @@ export class PreviewLogSession {
       launch = vscode.debug.startDebugging(undefined, {
         type: 'editor-browser', request: 'attach', name: 'Flutter Web Preview',
         urlFilter: `${new URL(attachment.url).origin}/*`, outputCapture: 'console',
+        timeout: 30000,
         noDebug: true, internalConsoleOptions: 'openOnSessionStart',
         flutterWebPreviewLogToken: attachment.token,
       }, {
@@ -84,7 +85,7 @@ export class PreviewLogSession {
       void pending.catch(() => {}).finally(() => this.pendingLaunches.delete(pending));
       const started = await Promise.race([
         launch,
-        new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Browser log connection timed out.')), 15000); }),
+        new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Browser log connection timed out.')), 60000); }),
       ]);
       if (attachment.cancelled) return;
       if (!started || !attachment.debugSession || attachment.terminated) throw new Error('Browser log connection was not established.');

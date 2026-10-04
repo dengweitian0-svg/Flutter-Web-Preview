@@ -10,6 +10,7 @@ import { sessionId } from '../../src/core/types';
 import { sdkRoot } from '../../src/project/resolveLaunch';
 import { endToEnd } from './endToEnd';
 import { shutdownTest } from './shutdown';
+import { logConsoleTest } from './logConsole';
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 export async function run(): Promise<void> {
@@ -21,6 +22,7 @@ export async function run(): Promise<void> {
     console.log(`CAPABILITIES: ${tools.map(tool => tool.name).join(', ')}`); return;
   }
   if (process.env.PREVIEW_TEST_MODE === 'e2e') { await endToEnd(); return; }
+  if (process.env.PREVIEW_TEST_MODE === 'logs') { await logConsoleTest(); return; }
   if (process.env.PREVIEW_TEST_MODE === 'shutdown') { await shutdownTest(); return; }
   if (process.env.PREVIEW_TEST_MODE === 'browser') { await browserLifecycle(); return; }
   if (process.env.PREVIEW_TEST_MODE === 'runtime') { await runtimeLifecycle(); return; }

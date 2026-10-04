@@ -106,7 +106,7 @@ describe('owned browser log sessions', () => {
     let finish!: () => void;
     debug.startDebugging.mockImplementation((_folder, config) => new Promise<boolean>(resolve => { finish = () => { start(config); resolve(true); }; }));
     const { adapter, events } = setup(); const pending = adapter.attach('preview-1', 'tab-1', 'http://127.0.0.1:7357/');
-    await vi.advanceTimersByTimeAsync(15000); await pending;
+    await vi.advanceTimersByTimeAsync(60000); await pending;
     expect(events).toHaveBeenCalledWith(expect.objectContaining({ type: 'LOG_SESSION_ERROR', message: expect.stringContaining('timed out') }));
     adapter.dispose(); await vi.advanceTimersByTimeAsync(0); finish(); await vi.advanceTimersByTimeAsync(0);
     expect(debug.stopDebugging).toHaveBeenCalledExactlyOnceWith(started[0]);

@@ -44,6 +44,25 @@ export class DevTools {
     if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails));
     return (result.result as { value?: unknown })?.value;
   }
+  async click(label: string): Promise<void> {
+    const expression = `(() => {
+      const button = [...document.querySelectorAll('[role="button"],button')].find(node => (node.getAttribute('aria-label') || node.textContent || '').includes(${JSON.stringify(label)}));
+      if (!button) return null;
+      const rect = button.getBoundingClientRect(); return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    })()`;
+    let point: { x: number; y: number } | undefined;
+    const start = Date.now();
+    while (!point) {
+      point = await this.evaluate(expression) as typeof point;
+      if (Date.now() - start > 15000) throw new Error(`No rendered button: ${label}`);
+      if (!point) await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    await this.request('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+    await this.request('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'left', clickCount: 1 });
+    // Flutter 3.35 defers semantic pointer initialization to the next event loop.
+    await new Promise(resolve => setTimeout(resolve, 60));
+    await this.request('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 });
+  }
   async screenshot(file: string): Promise<void> {
     const result = await this.request('Page.captureScreenshot', { format: 'png' });
     if (typeof result.data !== 'string') throw new Error('CDP screenshot returned no data.');

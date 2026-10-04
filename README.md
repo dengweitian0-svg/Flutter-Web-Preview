@@ -166,7 +166,7 @@ $env:PREVIEW_STRESS_CYCLES = '20'
 npm run test:extension
 ```
 
-VS Code 1.140.0 由测试工具自动下载并缓存在 `.cache/vscode-test/`。已有可用 SDK 时，也可省略下载步骤，通过 `PATH` 自动查找 Flutter。`VSCODE_EXECUTABLE` 和 `FLUTTER_SDK_PATH` 保留为可选的本机覆盖，不必写入仓库文件。将 `PREVIEW_TEST_MODE` 设为 `browser` 可单独测试浏览器适配器。
+VS Code 1.140.0 由测试工具自动下载并缓存在 `.cache/vscode-test/`。已有可用 SDK 时，也可省略下载步骤，通过 `PATH` 自动查找 Flutter。`VSCODE_EXECUTABLE` 和 `FLUTTER_SDK_PATH` 保留为可选的本机覆盖，不必写入仓库文件。将 `PREVIEW_TEST_MODE` 设为 `browser` 可单独测试浏览器适配器，设为 `logs` 可验证真实 Flutter 点击及异步日志、调试控制台显示、刷新和会话清理。
 
 安装生命周期测试脚本也支持自动下载 VS Code；运行它之前，仍需将生成的 VSIX 安装到仓库 `.cache/vsix-extensions/` 测试扩展目录。
 
@@ -181,6 +181,8 @@ VS Code 1.140.0 由测试工具自动下载并缓存在 `.cache/vscode-test/`。
 Preview Flutter Web inside VS Code on **local Windows**. Use VS Code **1.140.0+** and a Flutter **3.35-series or later stable SDK**.
 
 Install the VSIX, open a trusted Flutter Web project, and run `flutter pub get`. Click **Run Web Preview** above the top-level `main()`, then save Dart files to recompile and refresh automatically. Close the preview tab to stop its Flutter server.
+
+Application logs appear automatically in the **Flutter Web Preview** Debug Console session, including `print`, `debugPrint`, and `dart:developer.log` from clicks and asynchronous callbacks. Use **Show Debug Console** to reopen it. Stopping this logging session also stops the preview.
 
 To build the VSIX from this repository, run `npm ci` followed by `npm run package`; the package is written to `artifacts/`. Page state may reset on refresh. If moving a tab pauses updates, use **Open Preview Browser** to explicitly bind it again. Flutter is resolved from extension settings, `dart.flutterSdkPath`, or `PATH`.
 
