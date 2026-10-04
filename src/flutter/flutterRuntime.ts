@@ -37,7 +37,7 @@ export class FlutterProcessRuntime implements FlutterRuntime {
       await access(path.join(spec.sdkPath, 'bin', 'flutter.bat'));
       await checkPort(spec.port);
       if (session.cancelled) return;
-      const args = ['run', '--machine', '-d', 'web-server', '--web-hostname', '127.0.0.1', '--web-port', String(spec.port), '--target', spec.entrypoint];
+      const args = ['--suppress-analytics', 'run', '--machine', '-d', 'web-server', '--web-hostname', '127.0.0.1', '--web-port', String(spec.port), '--target', spec.entrypoint];
       this.log(`Starting Flutter in ${spec.projectRoot}\nflutter ${args.join(' ')}\n`);
       const child = spawnFlutter(spec.sdkPath, args, spec.projectRoot);
       session.process = child;
@@ -99,10 +99,11 @@ export class FlutterProcessRuntime implements FlutterRuntime {
     if (!session || session.id !== id || session.cancelled || !session.appId || !session.client) throw new Error('Flutter is not ready for updates.');
     const start = Date.now();
     const result = await session.client.request('app.restart', { appId: session.appId, fullRestart: true, pause: false, reason }, timeout);
+    const completedAt = Date.now();
     if (!result || typeof result !== 'object' || typeof (result as Record<string, unknown>).code !== 'number') throw new Error('Flutter returned an invalid compilation response.');
     const value = result as Record<string, unknown>;
     this.log(`Compilation ${value.code === 0 ? 'succeeded' : 'failed'} (${Date.now() - start} ms).\n`);
-    return { code: value.code as number, message: typeof value.message === 'string' ? value.message : undefined };
+    return { code: value.code as number, message: typeof value.message === 'string' ? value.message : undefined, completedAt };
   }
   async stop(id: string): Promise<void> {
     const session = this.session;

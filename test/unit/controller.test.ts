@@ -67,4 +67,25 @@ describe('update scheduling and cleanup', () => {
     expect(runtime.recompile).not.toHaveBeenCalled();
     await controller.dispose();
   });
+  it('does not resolve Stop or dispose successfully when cleanup failed', async () => {
+    const runtime = { events: new Signal<RuntimeEvent>(), start: vi.fn(async () => {}), recompile: vi.fn(async () => ({ code: 0 })), stop: vi.fn(async (): Promise<void> => { throw new Error('Access denied'); }) };
+    const browser = { events: new Signal<BrowserEvent>(), open: vi.fn(async () => {}), refresh: vi.fn(async () => {}), release: vi.fn(async () => {}) };
+    const controller = new PreviewSessionController(runtime, browser, vi.fn());
+    controller.dispatch({ type: 'RUN', spec });
+    await expect(controller.stop()).rejects.toThrow('cleanup did not complete');
+    expect(controller.current.state.kind).toBe('stopping');
+    expect(browser.release).not.toHaveBeenCalled();
+    runtime.stop.mockImplementation(async () => {});
+    await controller.dispose();
+    expect(controller.current.state.kind).toBe('stopped');
+  });
+  it('does not accept another launch while deactivation cleanup is pending', async () => {
+    const app = setup();
+    const disposed = app.controller.dispose();
+    app.controller.dispatch({ type: 'RUN', spec: { ...spec, entrypoint: 'lib/other.dart' } });
+    expect(app.controller.current.context.nextSpec).toBeUndefined();
+    app.finishStop(); await disposed;
+    expect(app.controller.current.state.kind).toBe('stopped');
+    expect(app.runtime.start).toHaveBeenCalledTimes(1);
+  });
 });

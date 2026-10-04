@@ -8,7 +8,7 @@ import { belongsToProject, nearestProject } from './project/flutterProject';
 import { numericSetting, resolveLaunch } from './project/resolveLaunch';
 import { mainOffsets } from './ui/dartMain';
 
-export interface PreviewStatus { state: SessionState['kind']; projectRoot?: string; url?: string; error?: string }
+export interface PreviewStatus { state: SessionState['kind']; projectRoot?: string; url?: string; error?: string; browserAvailable: boolean; lastRefreshLatencyMs?: number }
 export interface PreviewApi { getStatus(): PreviewStatus }
 let controller: PreviewSessionController | undefined;
 let browser: IntegratedBrowser | undefined;
@@ -33,12 +33,19 @@ export function activate(context: vscode.ExtensionContext): PreviewApi {
   controller = session;
   context.subscriptions.push(preview.events.subscribe(event => {
     if (event.type === 'BROWSER_CLOSED' && event.sessionId === sessionId(session.current.state) && event.bindingId === session.current.context.bindingId) intent++;
+    if (event.type === 'BROWSER_ERROR' && event.bindingLost && event.sessionId === sessionId(session.current.state)) {
+      void vscode.window.showWarningMessage(event.message, 'Open Preview Browser', 'Stop Web Preview').then(choice => {
+        if (event.sessionId !== sessionId(session.current.state)) return;
+        if (choice === 'Open Preview Browser') void vscode.commands.executeCommand('flutterWebPreview.openBrowser');
+        if (choice === 'Stop Web Preview') void vscode.commands.executeCommand('flutterWebPreview.stop');
+      });
+    }
   }));
   const status = vscode.window.createStatusBarItem('flutterWebPreview.status', vscode.StatusBarAlignment.Left, 25);
   status.command = 'flutterWebPreview.actions';
   const updateStatus = () => {
     const { state, context: current } = session.current;
-    const error = state.kind === 'failed' ? state.failure : state.kind === 'running' ? state.lastError : undefined;
+    const error = state.kind === 'failed' ? state.failure : state.kind === 'running' ? state.lastError ?? (!current.browserOpen ? 'Preview browser unavailable. Use Open Preview Browser.' : undefined) : undefined;
     const icons = { stopped: 'globe', starting: 'loading~spin', running: error ? 'warning' : 'globe', updating: 'sync~spin', stopping: 'loading~spin', failed: 'error' };
     status.text = `$(${icons[state.kind]}) Web Preview: ${state.kind}`;
     status.tooltip = error ?? (current.currentSpec ? `${path.basename(current.currentSpec.projectRoot)} — ${state.kind}` : 'Run a Flutter Web preview');
@@ -96,7 +103,7 @@ export function activate(context: vscode.ExtensionContext): PreviewApi {
     }).catch(error => report(String(error)));
   }));
   const lensChanges = new vscode.EventEmitter<void>();
-  context.subscriptions.push(lensChanges, vscode.languages.registerCodeLensProvider({ scheme: 'file', language: 'dart' }, {
+  context.subscriptions.push(lensChanges, vscode.languages.registerCodeLensProvider([{ scheme: 'file', language: 'dart' }, { scheme: 'file', pattern: '**/*.dart' }], {
     onDidChangeCodeLenses: lensChanges.event,
     async provideCodeLenses(document) {
       if (!vscode.workspace.getConfiguration('flutterWebPreview', document.uri).get<boolean>('showCodeLens', true)) return [];
@@ -115,7 +122,7 @@ export function activate(context: vscode.ExtensionContext): PreviewApi {
   log('Flutter Web Preview activated. Closing the preview stops its Flutter process.');
   return { getStatus: () => {
     const { state, context: current } = session.current;
-    return { state: state.kind, projectRoot: current.currentSpec?.projectRoot, url: current.url, error: state.kind === 'failed' ? state.failure : state.kind === 'running' ? state.lastError : undefined };
+    return { state: state.kind, projectRoot: current.currentSpec?.projectRoot, url: current.url, browserAvailable: current.browserOpen, lastRefreshLatencyMs: current.lastRefreshLatencyMs, error: state.kind === 'failed' ? state.failure : state.kind === 'running' ? state.lastError : undefined };
   } };
 }
 

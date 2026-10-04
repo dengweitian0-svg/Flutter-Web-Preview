@@ -92,7 +92,7 @@ export function transition(snapshot: Snapshot, event: SessionEvent): Transition 
     case 'COMPILED':
       if (state.kind !== 'updating' || event.operationId !== state.operationId) break;
       result.state = { kind: 'running', session: state.session, lastError: event.code === 0 ? undefined : event.message ?? 'Flutter compilation failed.' };
-      if (event.code === 0 && context.browserOpen) effects.push({ type: 'REFRESH', sessionId: id!, operationId: event.operationId });
+      if (event.code === 0 && context.browserOpen) effects.push({ type: 'REFRESH', sessionId: id!, operationId: event.operationId, completedAt: event.completedAt });
       if (event.code !== 0) effects.push({ type: 'REPORT', message: event.message ?? 'Flutter compilation failed. Fix the Dart error and save again.' });
       drain();
       break;
@@ -108,6 +108,9 @@ export function transition(snapshot: Snapshot, event: SessionEvent): Transition 
         if (state.kind === 'running') result.state = { ...state, lastError: event.message };
         effects.push({ type: 'REPORT', message: event.message });
       }
+      break;
+    case 'BROWSER_REFRESHED':
+      if ((state.kind === 'running' || state.kind === 'updating') && context.browserOpen && event.bindingId === context.bindingId) context.lastRefreshLatencyMs = event.latencyMs;
       break;
     case 'FATAL':
       if (state.kind !== 'stopping') { context.nextSpec = undefined; stop('failed', event.message); }

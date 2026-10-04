@@ -11,6 +11,7 @@ export class PreviewSessionController {
   private startup?: ReturnType<typeof setTimeout>;
   private stopTask?: Promise<void>;
   private disposed = false;
+  private disposing = false;
   readonly changes = new Signal<Snapshot>();
   constructor(private readonly runtime: FlutterRuntime, private readonly browser: PreviewBrowser, private readonly report: (message: string) => void, private readonly log: (message: string) => void = () => {}, private readonly reloadTimeout: (snapshot: Snapshot) => number = snapshot => snapshot.context.currentSpec?.reloadTimeout ?? 30000) {
     this.subscriptions = [runtime.events.subscribe(e => this.dispatch(e)), browser.events.subscribe(e => this.dispatch(e))];
@@ -18,6 +19,7 @@ export class PreviewSessionController {
   get current(): Snapshot { return this.snapshot; }
   dispatch(event: SessionEvent): void {
     if (this.disposed) return;
+    if (this.disposing && ['RUN', 'RESTART', 'SAVE', 'UPDATE', 'OPEN_BROWSER', 'REFRESH_BROWSER'].includes(event.type)) return;
     this.events.push(event);
     if (this.processing) return;
     this.processing = true;
@@ -76,7 +78,7 @@ export class PreviewSessionController {
         void this.browser.open(effect.sessionId, effect.url).catch(error => this.dispatch({ type: 'BROWSER_ERROR', sessionId: effect.sessionId, message: String(error) }));
         break;
       case 'REFRESH':
-        void this.browser.refresh(effect.sessionId).catch(error => this.dispatch({ type: 'BROWSER_ERROR', sessionId: effect.sessionId, message: String(error) }));
+        void this.browser.refresh(effect.sessionId, effect.completedAt).catch(error => this.dispatch({ type: 'BROWSER_ERROR', sessionId: effect.sessionId, message: String(error) }));
         break;
     }
   }
@@ -92,12 +94,16 @@ export class PreviewSessionController {
     this.dispatch({ type: 'STOP' });
     if (retry) this.stopTask = this.cleanup(sessionId(this.snapshot.state)!);
     await this.stopTask;
+    if (this.snapshot.state.kind === 'stopping') throw new Error('Flutter cleanup did not complete. See the output and retry Stop.');
   }
   async dispose(): Promise<void> {
-    await this.stop();
-    this.clearTimers();
-    for (const subscription of this.subscriptions) subscription.dispose();
-    this.disposed = true;
-    this.changes.clear();
+    this.disposing = true;
+    try {
+      await this.stop();
+      this.clearTimers();
+      for (const subscription of this.subscriptions) subscription.dispose();
+      this.disposed = true;
+      this.changes.clear();
+    } finally { this.disposing = false; }
   }
 }

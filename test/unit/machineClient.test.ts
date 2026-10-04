@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MachineClient } from '../../src/flutter/machineClient';
 import { flutterCommand } from '../../src/flutter/windowsProcess';
+import { spawnFlutter } from '../../src/flutter/windowsProcess';
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import path from 'node:path';
 afterEach(() => vi.useRealTimers());
 describe('machine protocol', () => {
   it('buffers chunks, parses multiple messages and leaves ordinary output visible', () => {
@@ -27,6 +30,17 @@ describe('machine protocol', () => {
   });
 });
 describe('Windows launcher', () => {
+  it.skipIf(process.platform !== 'win32')('runs a batch file with spaces, Chinese and ampersands in real paths', async () => {
+    const root = await mkdtemp(path.resolve('.cache/SDK 中文 & tools-'));
+    try {
+      await mkdir(path.join(root, 'bin'));
+      await writeFile(path.join(root, 'bin', 'flutter.bat'), '@echo off\r\necho ARG="%~2"\r\n');
+      const child = spawnFlutter(root, ['--target', 'lib/main & page.dart'], root);
+      let output = ''; child.stdout.on('data', data => { output += String(data); });
+      const code = await new Promise<number | null>((resolve, reject) => { child.on('error', reject); child.on('close', resolve); });
+      expect(code).toBe(0); expect(output).toContain('ARG="lib/main & page.dart"');
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
   it('quotes SDK and target paths including spaces, Chinese and shell metacharacters', () => {
     const command = flutterCommand('D:\\Flutter SDK 中文 & tools', ['run', '--target', 'lib/main file.dart']);
     expect(command).toContain('"D:\\Flutter SDK 中文 & tools\\bin\\flutter.bat"');

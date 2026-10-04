@@ -94,4 +94,11 @@ describe('session transitions', () => {
     const start = step(stopped, { type: 'RESTART', spec: updated });
     expect(start.state).toMatchObject({ kind: 'starting', spec: updated });
   });
+  it('feeds browser refresh results back into the owned session and ignores stale bindings', () => {
+    const current = step(ready(), { type: 'BROWSER_REFRESHED', sessionId: 'preview-1', bindingId: 'tab-1', latencyMs: 80 });
+    expect(current.context.lastRefreshLatencyMs).toBe(80);
+    expect(step(current, { type: 'BROWSER_REFRESHED', sessionId: 'preview-1', bindingId: 'old', latencyMs: 999 }).context.lastRefreshLatencyMs).toBe(80);
+    const stopping = step(current, { type: 'STOP' });
+    expect(step(stopping, { type: 'BROWSER_REFRESHED', sessionId: 'preview-1', bindingId: 'tab-1', latencyMs: 999 }).context.lastRefreshLatencyMs).toBe(80);
+  });
 });

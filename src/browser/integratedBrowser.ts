@@ -3,7 +3,7 @@ import { Signal } from '../core/signal';
 import type { BrowserEvent, PreviewBrowser } from '../core/types';
 import { TabTracker } from './tabTracker';
 
-interface Binding { sessionId: string; bindingId: string; url: string; tracker: TabTracker<vscode.Tab> }
+interface Binding { sessionId: string; bindingId: string; url: string; tracker: TabTracker<vscode.Tab>; ownershipReported?: boolean }
 export class IntegratedBrowser implements PreviewBrowser {
   readonly events = new Signal<BrowserEvent>();
   private binding?: Binding;
@@ -36,7 +36,10 @@ export class IntegratedBrowser implements PreviewBrowser {
         binding.tracker.clear();
         this.events.emit({ type: 'BROWSER_CLOSED', sessionId: binding.sessionId, bindingId: binding.bindingId });
       } else if (result === 'ambiguous') {
-        this.events.emit({ type: 'BROWSER_ERROR', sessionId: binding.sessionId, bindingLost: true, message: 'Cannot identify the moved preview tab. Use Open Preview Browser to bind it again.' });
+        if (!binding.ownershipReported) {
+          binding.ownershipReported = true;
+          this.events.emit({ type: 'BROWSER_ERROR', sessionId: binding.sessionId, bindingLost: true, message: 'Preview tab identity changed. Automatic updates are paused. Use Open Preview Browser to rebind, or Stop Web Preview.' });
+        }
       }
     }, 75);
   }
@@ -73,7 +76,7 @@ export class IntegratedBrowser implements PreviewBrowser {
       await new Promise(resolve => setTimeout(resolve, 25));
     }
   }
-  async refresh(id: string): Promise<void> {
+  async refresh(id: string, completedAt?: number): Promise<void> {
     return this.enqueue(async () => {
       const binding = this.binding;
       if (!binding || binding.sessionId !== id || !this.active(id)) return;
@@ -98,7 +101,9 @@ export class IntegratedBrowser implements PreviewBrowser {
       await new Promise(resolve => setTimeout(resolve, 25));
       if (!this.active(id) || this.binding !== binding || !this.tabs().includes(tab)) return;
       if (vscode.window.tabGroups.activeTabGroup.activeTab !== tab) throw new Error('Cannot focus the owned preview tab.');
+      const latencyMs = completedAt === undefined ? undefined : Date.now() - completedAt;
       await vscode.commands.executeCommand('workbench.action.browser.reload');
+      this.events.emit({ type: 'BROWSER_REFRESHED', sessionId: id, bindingId: binding.bindingId, latencyMs });
       this.log('Preview browser refreshed.\n');
       if (previous && this.active(id) && !previous.document.isClosed) {
         const editor = await vscode.window.showTextDocument(previous.document, { viewColumn: previous.viewColumn, preserveFocus: false });
