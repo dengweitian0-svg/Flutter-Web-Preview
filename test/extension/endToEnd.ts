@@ -55,10 +55,13 @@ export async function endToEnd(): Promise<void> {
     assert.equal(api.getStatus().state, 'running', api.getStatus().error);
     await rendered('Preview version 1'); await devTools!.screenshot(path.join(artifacts, 'preview-before.png'));
     checks.push('Run renders Flutter in Integrated Browser');
+    await vscode.window.showTextDocument(document, vscode.ViewColumn.One);
     await replace(original.replace('Preview version 1', 'Preview version 2'));
-    await rendered('Preview version 2'); await devTools!.screenshot(path.join(artifacts, 'preview-after.png'));
+    await rendered('Preview version 2');
+    await until(() => api.getStatus().lastRefreshLatencyMs !== undefined && vscode.window.activeTextEditor?.document.uri.toString() === file.toString(), 5000);
     assert(api.getStatus().lastRefreshLatencyMs !== undefined && api.getStatus().lastRefreshLatencyMs! <= 500, 'Successful compile must request browser refresh within 500 ms');
     assert.equal(vscode.window.activeTextEditor?.document.uri.toString(), file.toString(), 'Automatic refresh must restore code focus');
+    await devTools!.screenshot(path.join(artifacts, 'preview-after.png'));
     checks.push('Dart save automatically compiles and visibly updates page');
     await replace(`${original}\ninvalid dart syntax !!!`);
     await until(() => !!api.getStatus().error, 45000);

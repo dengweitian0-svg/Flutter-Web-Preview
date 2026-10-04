@@ -103,12 +103,12 @@ export class IntegratedBrowser implements PreviewBrowser {
       if (vscode.window.tabGroups.activeTabGroup.activeTab !== tab) throw new Error('Cannot focus the owned preview tab.');
       const latencyMs = completedAt === undefined ? undefined : Date.now() - completedAt;
       await vscode.commands.executeCommand('workbench.action.browser.reload');
-      this.events.emit({ type: 'BROWSER_REFRESHED', sessionId: id, bindingId: binding.bindingId, latencyMs });
       this.log('Preview browser refreshed.\n');
       if (previous && this.active(id) && !previous.document.isClosed) {
         const editor = await vscode.window.showTextDocument(previous.document, { viewColumn: previous.viewColumn, preserveFocus: false });
         if (selection) editor.selections = selection;
       }
+      if (this.active(id) && this.binding === binding) this.events.emit({ type: 'BROWSER_REFRESHED', sessionId: id, bindingId: binding.bindingId, latencyMs });
     });
   }
   async release(id: string): Promise<void> {
