@@ -67,3 +67,12 @@
 - 安装包的最终端到端验证通过 Auto Save、reloadOnSave 即时切换、非法实时超时配置恢复、Restart 重读端口，以及成功编译后 500 ms 内发起刷新，记录在 `artifacts/vsix-final-test.log`。
 - CI 文件已做 YAML 结构校验并包含两个 stable SDK 的测试矩阵；尚未推送或在 GitHub Actions 上执行，不将本地结果描述为云端 CI 已通过。
 - 最终安装包复验确认刷新完成反馈发生在代码焦点恢复之后；截图与编辑器恢复分别验证，避免将截图期间的焦点变化误当作插件故障。最新包的完整端到端检查再次通过。
+
+## 目录可移植性（2026-10-05）
+
+- 运行时测试移除了固定的 `D:\flutter\flutter` SDK 路径，复用扩展的 SDK 查找逻辑；环境变量仍可显式覆盖。
+- Windows 启动器从 `ComSpec` 或 `SystemRoot` / `windir` 定位命令解释器，不再假定 Windows 安装在 C 盘。
+- 两类 VS Code 测试入口都支持自动下载 1.140.0 到仓库 `.cache/vscode-test/`；安装生命周期测试仍要求先把 VSIX 安装到独立测试扩展目录。
+- README 的测试步骤从仓库 `.cache/` 推导 SDK 和 pub 缓存路径；单元测试会先创建所需缓存目录。本地样例设置中遗留的绝对 SDK 路径已移除，该设置文件不纳入版本控制。
+- 类型检查、lint、49 个单元测试和 VSIX 打包通过；新增测试覆盖非 C 盘的 Windows 根目录及环境变量缺失。
+- 自动下载 VS Code 成功。未设置 `FLUTTER_SDK_PATH` 时，真实 Extension Host 已从 `PATH` 完成 SDK 解析，但完整 E2E 被本机已占用的 7357 服务端口与 9333 CDP 端口阻挡，未通过；没有结束占用这些端口的其他进程。

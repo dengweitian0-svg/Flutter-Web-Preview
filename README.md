@@ -88,15 +88,19 @@ npm run package
 
 ## 配置
 
-默认配置可直接使用。若未找到 Flutter，在 VS Code 的 `settings.json` 中指定 **SDK 根目录**，该目录应包含 `bin/flutter.bat`：
+默认配置可直接使用。将 Flutter SDK 的 `bin` 目录加入 `PATH` 后，扩展会自动查找 SDK；使用 Dart/Flutter 官方扩展时，也可以复用它的 `dart.flutterSdkPath` 配置。
+
+无需在仓库配置中填写个人安装目录：
 
 ```json
 {
-  "flutterWebPreview.flutterSdkPath": "D:\\flutter\\flutter"
+  "flutterWebPreview.flutterSdkPath": ""
 }
 ```
 
 SDK 查找顺序为 `flutterWebPreview.flutterSdkPath`、`dart.flutterSdkPath`、`PATH`。
+
+若需要显式指定 SDK，请在自己的 VS Code 用户设置中填写根目录（包含 `bin/flutter.bat`），避免把个人绝对路径提交到共享工作区配置。
 
 | 配置项（前缀为 `flutterWebPreview.`） | 默认值 | 说明 |
 | --- | --- | --- |
@@ -145,17 +149,26 @@ npm run build
 <details>
 <summary>真实 VS Code 与 Flutter 的端到端验证</summary>
 
-在仓库根目录使用 PowerShell 执行，按本机安装位置修改路径：
+在仓库根目录使用 PowerShell 执行。以下步骤下载固定版本的 Flutter 到仓库 `.cache/`，不需要填写本机安装目录：
 
 ```powershell
-$env:VSCODE_EXECUTABLE = 'C:\Program Files\Microsoft VS Code\Code.exe'
-$env:FLUTTER_SDK_PATH = 'D:\flutter\flutter'
+node scripts/prepare-flutter-sdk.mjs 3.47.6
+$env:FLUTTER_SDK_PATH = (Resolve-Path '.\.cache\flutter-sdk\3.47.6\flutter').Path
+$env:PUB_CACHE = Join-Path (Get-Location).Path '.cache\pub'
+Push-Location 'test/fixtures/flutter_app'
+try {
+  & (Join-Path $env:FLUTTER_SDK_PATH 'bin\flutter.bat') --suppress-analytics pub get
+} finally {
+  Pop-Location
+}
 $env:PREVIEW_TEST_MODE = 'e2e'
 $env:PREVIEW_STRESS_CYCLES = '20'
 npm run test:extension
 ```
 
-`VSCODE_EXECUTABLE` 可省略，由测试工具下载 VS Code；`FLUTTER_SDK_PATH` 可用于指定测试 SDK。将 `PREVIEW_TEST_MODE` 设为 `browser` 可单独测试浏览器适配器。
+VS Code 1.140.0 由测试工具自动下载并缓存在 `.cache/vscode-test/`。已有可用 SDK 时，也可省略下载步骤，通过 `PATH` 自动查找 Flutter。`VSCODE_EXECUTABLE` 和 `FLUTTER_SDK_PATH` 保留为可选的本机覆盖，不必写入仓库文件。将 `PREVIEW_TEST_MODE` 设为 `browser` 可单独测试浏览器适配器。
+
+安装生命周期测试脚本也支持自动下载 VS Code；运行它之前，仍需将生成的 VSIX 安装到仓库 `.cache/vsix-extensions/` 测试扩展目录。
 
 测试使用仓库 `.cache/` 下的独立 VS Code 配置目录，结束时恢复样例 Dart 内容，截图和运行结果写入 `artifacts/`。CDP 调试端口仅用于测试。
 

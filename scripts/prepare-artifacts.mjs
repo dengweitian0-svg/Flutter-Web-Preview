@@ -1,2 +1,2 @@
 import { mkdir } from 'node:fs/promises';
-await mkdir('artifacts', { recursive: true });
+await Promise.all(['artifacts', '.cache'].map(directory => mkdir(directory, { recursive: true })));

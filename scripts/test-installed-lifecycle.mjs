@@ -5,9 +5,9 @@ import { writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { downloadAndUnzipVSCode } from '@vscode/test-electron';
 const { DevTools } = createRequire(import.meta.url)('../dist/test/devTools.js');
-const executable = process.env.VSCODE_EXECUTABLE;
-if (!executable) throw new Error('Set VSCODE_EXECUTABLE to Code.exe. Install the VSIX into .cache/vsix-extensions first.');
+const executable = process.env.VSCODE_EXECUTABLE || await downloadAndUnzipVSCode({ version: '1.140.0', cachePath: path.resolve('.cache/vscode-test') });
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(predicate, timeout = 120000) {
   const start = Date.now();
@@ -19,7 +19,9 @@ async function portFree() {
 assert(await portFree(), 'The fixture port must be free before this test.');
 const profile = path.resolve(`.cache/installed-lifecycle-${randomUUID()}`);
 await mkdir(profile, { recursive: true });
-const child = spawn(executable, [path.resolve('test/fixtures/flutter_app'), '--new-window', '--skip-welcome', '--skip-release-notes', '--disable-workspace-trust', '--disable-updates', '--remote-debugging-port=9334', '--remote-debugging-address=127.0.0.1', '--user-data-dir', profile, '--extensions-dir', path.resolve('.cache/vsix-extensions')], { windowsHide: true });
+const env = { ...process.env };
+if (env.FLUTTER_SDK_PATH) env.PATH = `${path.join(env.FLUTTER_SDK_PATH, 'bin')}${path.delimiter}${env.PATH ?? ''}`;
+const child = spawn(executable, [path.resolve('test/fixtures/flutter_app'), '--new-window', '--skip-welcome', '--skip-release-notes', '--disable-workspace-trust', '--disable-updates', '--remote-debugging-port=9334', '--remote-debugging-address=127.0.0.1', '--user-data-dir', profile, '--extensions-dir', path.resolve('.cache/vsix-extensions')], { windowsHide: true, env });
 let output = ''; child.stdout.on('data', text => { output += String(text); }); child.stderr.on('data', text => { output += String(text); });
 const exit = new Promise(resolve => child.on('exit', (code, signal) => resolve({ code, signal })));
 let client;

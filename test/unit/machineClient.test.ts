@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MachineClient } from '../../src/flutter/machineClient';
-import { flutterCommand } from '../../src/flutter/windowsProcess';
+import { commandInterpreter, flutterCommand } from '../../src/flutter/windowsProcess';
 import { spawnFlutter } from '../../src/flutter/windowsProcess';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
@@ -30,6 +30,15 @@ describe('machine protocol', () => {
   });
 });
 describe('Windows launcher', () => {
+  it('uses the configured command interpreter before the Windows root', () => {
+    expect(commandInterpreter({ ComSpec: 'E:\\Custom Windows\\cmd.exe', SystemRoot: 'F:\\Windows' })).toBe('E:\\Custom Windows\\cmd.exe');
+  });
+  it.each(['SystemRoot', 'windir'])('derives cmd.exe from %s without assuming a drive', name => {
+    expect(commandInterpreter({ [name]: 'E:\\Windows' })).toBe('E:\\Windows\\System32\\cmd.exe');
+  });
+  it('reports a missing Windows environment instead of assuming C:', () => {
+    expect(() => commandInterpreter({})).toThrow('Cannot locate cmd.exe');
+  });
   it.skipIf(process.platform !== 'win32')('runs a batch file with spaces, Chinese and ampersands in real paths', async () => {
     const root = await mkdtemp(path.resolve('.cache/SDK 中文 & tools-'));
     try {
