@@ -46,7 +46,7 @@
     "watch": "node scripts/build.mjs --watch",
     "check": "tsc --noEmit",
     "lint": "eslint src test/unit test/extension scripts",
-    "test": "vitest run",
+    "test": "node scripts/prepare-artifacts.mjs && vitest run",
     "test:extension": "npm run build && node scripts/test-extension.mjs",
     "vscode:prepublish": "npm run check && npm run build",
     "package": "node scripts/prepare-artifacts.mjs && vsce package --no-dependencies --out artifacts/flutter-web-preview-0.1.0.vsix"

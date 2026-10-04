@@ -7,6 +7,7 @@ import { IntegratedBrowser } from '../../src/browser/integratedBrowser';
 import { FlutterProcessRuntime, checkPort } from '../../src/flutter/flutterRuntime';
 import { PreviewSessionController } from '../../src/core/controller';
 import { sessionId } from '../../src/core/types';
+import { sdkRoot } from '../../src/project/resolveLaunch';
 import { endToEnd } from './endToEnd';
 import { shutdownTest } from './shutdown';
 
@@ -67,7 +68,8 @@ async function runtimeLifecycle(): Promise<void> {
   const controller: PreviewSessionController = new PreviewSessionController(runtime, browser, message => { report.push(message); console.log(message); }, console.log);
   try {
     await vscode.window.showTextDocument(vscode.Uri.file(file));
-    controller.dispatch({ type: 'RUN', spec: { projectRoot: root, entrypoint: file, sdkPath: process.env.FLUTTER_SDK_PATH ?? 'D:\\flutter\\flutter', port: 7357, startupTimeout: 180000, reloadTimeout: 30000 } });
+    const sdkPath = process.env.FLUTTER_SDK_PATH || await sdkRoot(vscode.Uri.file(root));
+    controller.dispatch({ type: 'RUN', spec: { projectRoot: root, entrypoint: file, sdkPath, port: 7357, startupTimeout: 180000, reloadTimeout: 30000 } });
     await until(() => controller.current.state.kind === 'running' || controller.current.state.kind === 'failed');
     assert.equal(controller.current.state.kind, 'running', report.join('\n'));
     await until(() => !!browser.currentTab || report.length > 0, 5000);
@@ -80,6 +82,7 @@ async function runtimeLifecycle(): Promise<void> {
     await vscode.commands.executeCommand('workbench.action.browser.open', { reuseUrlFilter: 'http://127.0.0.1:7357/**' });
     await vscode.commands.executeCommand('workbench.action.moveEditorToNextGroup'); await wait(400);
     assert.equal(controller.current.state.kind, 'running');
+    await browser.open(sessionId(controller.current.state)!, controller.current.context.url!);
     assert(browser.currentTab);
     await vscode.window.tabGroups.close(browser.currentTab!);
     await until(() => controller.current.state.kind === 'stopped', 15000);

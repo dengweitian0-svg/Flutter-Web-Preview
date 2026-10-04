@@ -10,8 +10,14 @@ export function flutterCommand(sdkPath: string, args: string[]): string {
   };
   return `"${[executable, ...args].map(quote).join(' ')}"`;
 }
+export function commandInterpreter(env: NodeJS.ProcessEnv = process.env): string {
+  if (env.ComSpec) return env.ComSpec;
+  const windowsRoot = env.SystemRoot || env.windir;
+  if (!windowsRoot) throw new Error('Cannot locate cmd.exe. Set ComSpec or SystemRoot in the Windows environment.');
+  return path.win32.join(windowsRoot, 'System32', 'cmd.exe');
+}
 export function spawnFlutter(sdkPath: string, args: string[], cwd: string): ChildProcessWithoutNullStreams {
-  return spawn(process.env.ComSpec ?? 'C:\\Windows\\System32\\cmd.exe', ['/d', '/v:off', '/s', '/c', flutterCommand(sdkPath, args)], {
+  return spawn(commandInterpreter(), ['/d', '/v:off', '/s', '/c', flutterCommand(sdkPath, args)], {
     cwd, windowsHide: true, windowsVerbatimArguments: true, stdio: ['pipe', 'pipe', 'pipe'],
   });
 }
