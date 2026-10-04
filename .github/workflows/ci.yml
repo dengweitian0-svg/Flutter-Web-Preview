@@ -1,0 +1,65 @@
+name: Windows extension checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run check
+      - run: npm run lint
+      - run: npm test
+      - run: npm run package
+      - uses: actions/upload-artifact@v7
+        with:
+          name: flutter-web-preview-vsix
+          path: artifacts/*.vsix
+          if-no-files-found: error
+
+  integration:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        flutter: ['3.35.1', '3.47.6']
+    env:
+      FLUTTER_SDK_PATH: ${{ github.workspace }}\.cache\flutter-sdk\${{ matrix.flutter }}\flutter
+      PUB_CACHE: ${{ github.workspace }}\.cache\pub
+      PREVIEW_TEST_MODE: e2e
+      PREVIEW_STRESS_CYCLES: '20'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci
+      - name: Download and verify Flutter SDK
+        run: node scripts/prepare-flutter-sdk.mjs ${{ matrix.flutter }}
+      - name: Prepare fixture
+        working-directory: test/fixtures/flutter_app
+        run: '& "$env:FLUTTER_SDK_PATH\bin\flutter.bat" --suppress-analytics pub get'
+      - run: npm run test:extension
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: integration-${{ matrix.flutter }}
+          path: artifacts/
+

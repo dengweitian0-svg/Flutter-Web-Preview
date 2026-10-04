@@ -10,14 +10,14 @@
   "categories": ["Other"],
   "keywords": ["flutter", "dart", "web", "preview"],
   "main": "./dist/extension.js",
+  "icon": "assets/icon.png",
   "extensionKind": ["workspace"],
   "capabilities": {
     "untrustedWorkspaces": { "supported": false, "description": "Preview runs the workspace's Flutter application." },
     "virtualWorkspaces": { "supported": false }
   },
-  "activationEvents": ["onLanguage:dart"],
+  "activationEvents": ["onLanguage:dart", "workspaceContains:**/pubspec.yaml"],
   "contributes": {
-    "languages": [{ "id": "dart", "aliases": ["Dart", "dart"], "extensions": [".dart"] }],
     "commands": [
       { "command": "flutterWebPreview.run", "title": "Run Web Preview", "category": "Flutter Web Preview" },
       { "command": "flutterWebPreview.stop", "title": "Stop Web Preview", "category": "Flutter Web Preview" },
@@ -49,7 +49,7 @@
     "test": "vitest run",
     "test:extension": "npm run build && node scripts/test-extension.mjs",
     "vscode:prepublish": "npm run check && npm run build",
-    "package": "vsce package --out artifacts/flutter-web-preview-0.1.0.vsix"
+    "package": "node scripts/prepare-artifacts.mjs && vsce package --no-dependencies --out artifacts/flutter-web-preview-0.1.0.vsix"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
