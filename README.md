@@ -7,6 +7,7 @@ Flutter Web Preview 是面向本地 Windows 开发的 VS Code 扩展。它将 Fl
 - **保存即更新**：支持手动保存和 Auto Save；连续保存会合并更新请求，编译完成后刷新页面。
 - **预览管理服务**：首次手动启动，关闭预览标签后停止对应 Flutter 服务并释放端口；之后保存文件不会重新启动。
 - **编译失败可恢复**：保留上一次成功的页面，修复错误并保存后继续更新；状态栏和 Output 提供运行状态与日志。
+- **应用日志可见**：自动连接预览浏览器，`print`、`debugPrint` 和 `dart:developer.log` 显示在调试控制台，包含点击和异步回调产生的输出。
 
 [快速开始](#快速开始) · [配置](#配置) · [常见问题与支持范围](#常见问题与支持范围) · [开发与验证](#开发与验证) · [English](#english-quick-start)
 
@@ -51,6 +52,10 @@ npm run package
 
 更新采用**重新编译并刷新整个页面**，计数器等内存状态可能重置。断点和完整调试请使用 Dart/Flutter 官方扩展。
 
+运行预览会自动展开 **Debug Console / 调试控制台**，选择 **Flutter Web Preview** 会话即可查看应用日志。保存、刷新后继续采集，日志到达不会反复抢焦点；`developer.log` 的附加信息可展开对象查看。停止这个日志会话也会停止预览及 Flutter 服务。
+
+日志功能使用 VS Code 内置 JavaScript Debugger，无需修改 Dart 代码或 `launch.json`。如果连接失败，预览仍可使用；启用内置 JavaScript Debugger 后执行 **Open Preview Browser** 重试。多个同 URL 的浏览器标签存在时，按 VS Code 提示选择当前预览。
+
 ## 保存前后
 
 以下截图来自仓库测试样例，展示保存 Dart 修改前后的实际 Flutter 页面。完整验证过程见[验证记录](docs/verification.md)。
@@ -79,6 +84,7 @@ npm run package
 | Open Preview Browser | 打开预览，或显式重新绑定预览标签 |
 | Reload Preview Browser | 仅刷新浏览器页面，不重新编译 |
 | Show Output | 查看 Flutter 运行、编译及扩展日志 |
+| Show Debug Console | 打开调试控制台查看应用日志 |
 
 ## 配置
 

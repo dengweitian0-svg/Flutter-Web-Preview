@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Show Flutter Web application console logs (`print`, `debugPrint`, and `dart:developer.log`) in an automatically attached Debug Console session.
+- Keep log capture across preview refreshes, and stop the preview when its owned logging session ends.
+- Add Show Debug Console, recoverable log connection warnings, and isolation from unrelated debug sessions.
+
 ## 0.1.0
 
 - Run Flutter Web inside VS Code Integrated Browser on local Windows.

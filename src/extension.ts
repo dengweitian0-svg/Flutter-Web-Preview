@@ -8,7 +8,7 @@ import { belongsToProject, nearestProject } from './project/flutterProject';
 import { numericSetting, resolveLaunch } from './project/resolveLaunch';
 import { mainOffsets } from './ui/dartMain';
 
-export interface PreviewStatus { state: SessionState['kind']; projectRoot?: string; url?: string; error?: string; browserAvailable: boolean; lastRefreshLatencyMs?: number }
+export interface PreviewStatus { state: SessionState['kind']; projectRoot?: string; url?: string; error?: string; browserAvailable: boolean; logConsoleConnected: boolean; lastRefreshLatencyMs?: number }
 export interface PreviewApi { getStatus(): PreviewStatus }
 let controller: PreviewSessionController | undefined;
 let browser: IntegratedBrowser | undefined;
@@ -32,7 +32,12 @@ export function activate(context: vscode.ExtensionContext): PreviewApi {
   });
   controller = session;
   context.subscriptions.push(preview.events.subscribe(event => {
-    if (event.type === 'BROWSER_CLOSED' && event.sessionId === sessionId(session.current.state) && event.bindingId === session.current.context.bindingId) intent++;
+    if ((event.type === 'BROWSER_CLOSED' || event.type === 'LOG_SESSION_ENDED') && event.sessionId === sessionId(session.current.state) && event.bindingId === session.current.context.bindingId) intent++;
+    if (event.type === 'LOG_SESSION_ERROR' && event.sessionId === sessionId(session.current.state) && event.bindingId === session.current.context.bindingId) {
+      void vscode.window.showWarningMessage(event.message, 'Open Preview Browser').then(choice => {
+        if (choice && event.sessionId === sessionId(session.current.state) && event.bindingId === session.current.context.bindingId) void vscode.commands.executeCommand('flutterWebPreview.openBrowser');
+      });
+    }
     if (event.type === 'BROWSER_ERROR' && event.bindingLost && event.sessionId === sessionId(session.current.state)) {
       void vscode.window.showWarningMessage(event.message, 'Open Preview Browser', 'Stop Web Preview').then(choice => {
         if (event.sessionId !== sessionId(session.current.state)) return;
@@ -45,7 +50,7 @@ export function activate(context: vscode.ExtensionContext): PreviewApi {
   status.command = 'flutterWebPreview.actions';
   const updateStatus = () => {
     const { state, context: current } = session.current;
-    const error = state.kind === 'failed' ? state.failure : state.kind === 'running' ? state.lastError ?? (!current.browserOpen ? 'Preview browser unavailable. Use Open Preview Browser.' : undefined) : undefined;
+    const error = state.kind === 'failed' ? state.failure : state.kind === 'running' ? state.lastError ?? current.logError ?? (!current.browserOpen ? 'Preview browser unavailable. Use Open Preview Browser.' : undefined) : undefined;
     const icons = { stopped: 'globe', starting: 'loading~spin', running: error ? 'warning' : 'globe', updating: 'sync~spin', stopping: 'loading~spin', failed: 'error' };
     status.text = `$(${icons[state.kind]}) Web Preview: ${state.kind}`;
     status.tooltip = error ?? (current.currentSpec ? `${path.basename(current.currentSpec.projectRoot)} — ${state.kind}` : 'Run a Flutter Web preview');
@@ -82,12 +87,13 @@ export function activate(context: vscode.ExtensionContext): PreviewApi {
   register('openBrowser', () => { session.dispatch({ type: 'OPEN_BROWSER' }); });
   register('reloadBrowser', () => { session.dispatch({ type: 'REFRESH_BROWSER' }); });
   register('showOutput', () => output.show(true));
+  register('showDebugConsole', () => vscode.commands.executeCommand('workbench.debug.action.focusRepl'));
   register('actions', async () => {
     const action = await vscode.window.showQuickPick([
       { label: 'Run Web Preview', command: 'run' }, { label: 'Stop Web Preview', command: 'stop' },
       { label: 'Restart Web Preview', command: 'restart' }, { label: 'Reload Web Preview', command: 'reload' },
       { label: 'Open Preview Browser', command: 'openBrowser' }, { label: 'Reload Preview Browser', command: 'reloadBrowser' },
-      { label: 'Show Output', command: 'showOutput' },
+      { label: 'Show Debug Console', command: 'showDebugConsole' }, { label: 'Show Output', command: 'showOutput' },
     ]);
     if (action) await vscode.commands.executeCommand(`flutterWebPreview.${action.command}`);
   });
@@ -122,7 +128,7 @@ export function activate(context: vscode.ExtensionContext): PreviewApi {
   log('Flutter Web Preview activated. Closing the preview stops its Flutter process.');
   return { getStatus: () => {
     const { state, context: current } = session.current;
-    return { state: state.kind, projectRoot: current.currentSpec?.projectRoot, url: current.url, browserAvailable: current.browserOpen, lastRefreshLatencyMs: current.lastRefreshLatencyMs, error: state.kind === 'failed' ? state.failure : state.kind === 'running' ? state.lastError : undefined };
+    return { state: state.kind, projectRoot: current.currentSpec?.projectRoot, url: current.url, browserAvailable: current.browserOpen, logConsoleConnected: current.logConsoleConnected ?? false, lastRefreshLatencyMs: current.lastRefreshLatencyMs, error: state.kind === 'failed' ? state.failure : state.kind === 'running' ? state.lastError ?? current.logError : undefined };
   } };
 }
 

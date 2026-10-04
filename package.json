@@ -25,7 +25,8 @@
       { "command": "flutterWebPreview.reload", "title": "Reload Web Preview", "category": "Flutter Web Preview" },
       { "command": "flutterWebPreview.openBrowser", "title": "Open Preview Browser", "category": "Flutter Web Preview" },
       { "command": "flutterWebPreview.reloadBrowser", "title": "Reload Preview Browser", "category": "Flutter Web Preview" },
-      { "command": "flutterWebPreview.showOutput", "title": "Show Output", "category": "Flutter Web Preview" }
+      { "command": "flutterWebPreview.showOutput", "title": "Show Output", "category": "Flutter Web Preview" },
+      { "command": "flutterWebPreview.showDebugConsole", "title": "Show Debug Console", "category": "Flutter Web Preview" }
     ],
     "configuration": {
       "title": "Flutter Web Preview",
