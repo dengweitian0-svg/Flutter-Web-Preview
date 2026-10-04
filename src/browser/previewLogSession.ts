@@ -5,7 +5,7 @@ import type { BrowserEvent } from '../core/types';
 
 interface Attachment {
   token: string; sessionId: string; bindingId: string; url: string;
-  cancelled: boolean; ready: boolean; terminated: boolean;
+  cancelled: boolean; ready: boolean; terminated: boolean; released?: boolean;
   debugSession?: vscode.DebugSession; task?: Promise<void>;
 }
 
@@ -27,7 +27,8 @@ export class PreviewLogSession {
         if (session.parentSession || typeof token !== 'string' || !token.startsWith(this.owner)) return;
         const attachment = this.attachments.get(token);
         if (!attachment || attachment.cancelled || this.disposed) {
-          void this.stop(session).catch(error => this.log(`Cannot release late log session: ${String(error)}\n`));
+          if (attachment) attachment.debugSession = session;
+          void (attachment ? this.stopAttachment(attachment) : this.stop(session)).catch(error => this.log(`Cannot release late log session: ${String(error)}\n`));
         } else attachment.debugSession = session;
       }),
       vscode.debug.onDidTerminateDebugSession(session => {
@@ -64,7 +65,7 @@ export class PreviewLogSession {
     let launch: Thenable<boolean> | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      if (previous?.debugSession && !previous.terminated) await this.stop(previous.debugSession);
+      if (previous) await this.stopAttachment(previous);
       if (previous?.ready) this.attachments.delete(previous.token);
       if (attachment.cancelled) return;
       if (!vscode.extensions.getExtension('ms-vscode.js-debug')) throw new Error('Enable the built-in JavaScript Debugger extension.');
@@ -100,32 +101,39 @@ export class PreviewLogSession {
     } finally {
       clearTimeout(timer);
       if (attachment.cancelled) {
-        if (attachment.debugSession && !attachment.terminated) {
-          await this.stop(attachment.debugSession).catch(error => this.log(`Cannot release log session: ${String(error)}\n`));
-        }
+        await this.stopAttachment(attachment).catch(error => this.log(`Cannot release log session: ${String(error)}\n`));
         // Retain cancellation listeners until a pending VS Code launch settles.
-        void Promise.resolve(launch).catch(() => {}).finally(() => this.attachments.delete(attachment.token));
+        void Promise.resolve(launch).catch(() => {}).finally(() => {
+          if (!attachment.debugSession || attachment.terminated || attachment.released) this.attachments.delete(attachment.token);
+        });
       }
     }
   }
 
   private async stop(session: vscode.DebugSession): Promise<void> { await vscode.debug.stopDebugging(session); }
+  private async stopAttachment(attachment: Attachment): Promise<void> {
+    if (!attachment.debugSession || attachment.terminated || attachment.released) return;
+    await this.stop(attachment.debugSession);
+    attachment.released = true;
+  }
 
   async release(sessionId: string): Promise<void> {
-    const attachment = this.current;
-    if (!attachment || attachment.sessionId !== sessionId) return;
-    attachment.cancelled = true;
-    this.current = undefined;
-    if (attachment.debugSession && !attachment.terminated) await this.stop(attachment.debugSession);
-    if (attachment.ready) this.attachments.delete(attachment.token);
+    const owned = [...this.attachments.values()].filter(attachment => attachment.sessionId === sessionId);
+    for (const attachment of owned) attachment.cancelled = true;
+    if (this.current?.sessionId === sessionId) this.current = undefined;
+    for (const attachment of owned) {
+      await this.stopAttachment(attachment);
+      if (attachment.ready) this.attachments.delete(attachment.token);
+    }
   }
 
   dispose(): void {
     this.disposed = true;
-    if (this.current) void this.release(this.current.sessionId).catch(error => this.log(`${String(error)}\n`));
+    const cleanup = [...new Set([...this.attachments.values()].map(attachment => attachment.sessionId))].map(id => this.release(id));
     this.events.clear();
     // A launch can finish after cancellation; its owned session must still be released.
-    void Promise.allSettled([...this.pendingLaunches, ...[...this.attachments.values()].map(attachment => attachment.task)]).then(() => {
+    void Promise.allSettled([...cleanup, ...this.pendingLaunches, ...[...this.attachments.values()].map(attachment => attachment.task)]).then(results => {
+      for (const result of results) if (result.status === 'rejected') this.log(`Cannot release log session: ${String(result.reason)}\n`);
       for (const subscription of this.subscriptions) subscription.dispose();
       this.attachments.clear();
     });

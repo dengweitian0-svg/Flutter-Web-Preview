@@ -71,6 +71,13 @@ describe('owned browser log sessions', () => {
     await adapter.release('preview-1'); finish(); await pending;
     expect(debug.stopDebugging).toHaveBeenCalledExactlyOnceWith(started[0]); expect(events).not.toHaveBeenCalled();
   });
+  it('retains a failed cleanup so Stop can retry releasing the owned session', async () => {
+    const { adapter, events } = setup(); await adapter.attach('preview-1', 'tab-1', 'http://127.0.0.1:7357/');
+    debug.stopDebugging.mockRejectedValueOnce(new Error('Transport failed'));
+    await expect(adapter.release('preview-1')).rejects.toThrow('Transport failed');
+    await adapter.release('preview-1');
+    expect(debug.stopDebugging).toHaveBeenCalledTimes(2); expect(events).toHaveBeenCalledTimes(1);
+  });
   it('rebinds to a new tab and ignores a late old termination', async () => {
     const { adapter, events } = setup(); await adapter.attach('preview-1', 'tab-1', 'http://127.0.0.1:7357/');
     const old = started[0]!;
