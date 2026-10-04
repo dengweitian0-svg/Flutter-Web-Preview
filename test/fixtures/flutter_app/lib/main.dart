@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
-void main() => runApp(const PreviewApp());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized().ensureSemantics();
+  runApp(const PreviewApp());
+}
 
 class PreviewApp extends StatelessWidget {
   const PreviewApp({super.key});

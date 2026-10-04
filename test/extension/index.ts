@@ -7,9 +7,20 @@ import { IntegratedBrowser } from '../../src/browser/integratedBrowser';
 import { FlutterProcessRuntime, checkPort } from '../../src/flutter/flutterRuntime';
 import { PreviewSessionController } from '../../src/core/controller';
 import { sessionId } from '../../src/core/types';
+import { endToEnd } from './endToEnd';
+import { shutdownTest } from './shutdown';
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 export async function run(): Promise<void> {
+  if (process.env.PREVIEW_TEST_MODE === 'capabilities') {
+    const root = vscode.extensions.getExtension('wende.flutter-web-preview')?.extensionPath; assert(root);
+    const tools = vscode.lm.tools.map(tool => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema }));
+    const commands = (await vscode.commands.getCommands(true)).filter(command => /browser/i.test(command));
+    await writeFile(path.join(root, 'artifacts/browser-capabilities.json'), JSON.stringify({ tools, commands }, null, 2));
+    console.log(`CAPABILITIES: ${tools.map(tool => tool.name).join(', ')}`); return;
+  }
+  if (process.env.PREVIEW_TEST_MODE === 'e2e') { await endToEnd(); return; }
+  if (process.env.PREVIEW_TEST_MODE === 'shutdown') { await shutdownTest(); return; }
   if (process.env.PREVIEW_TEST_MODE === 'browser') { await browserLifecycle(); return; }
   if (process.env.PREVIEW_TEST_MODE === 'runtime') { await runtimeLifecycle(); return; }
   const trace: unknown[] = [];
@@ -85,8 +96,9 @@ async function browserLifecycle(): Promise<void> {
   const server = createServer((_request, response) => { response.setHeader('Content-Type', 'text/html'); response.end('<html><head><title>Preview fixture</title></head><body>Preview fixture</body></html>'); });
   await new Promise<void>(resolve => server.listen(7357, '127.0.0.1', resolve));
   let closed = 0; let active = true;
+  let lost = false;
   const browser = new IntegratedBrowser(() => active, console.log);
-  browser.events.subscribe(event => { if (event.type === 'BROWSER_CLOSED') { closed++; active = false; } });
+  browser.events.subscribe(event => { if (event.type === 'BROWSER_CLOSED') { closed++; active = false; } if (event.type === 'BROWSER_ERROR' && event.bindingLost) lost = true; });
   try {
     await IntegratedBrowser.checkSupport();
     await browser.open('browser-test', 'http://127.0.0.1:7357/');
@@ -95,7 +107,9 @@ async function browserLifecycle(): Promise<void> {
     await vscode.commands.executeCommand('workbench.action.moveEditorToNextGroup');
     await wait(500);
     assert.equal(closed, 0, 'Moving the preview must not stop it');
-    assert(browser.currentTab && browser.currentTab !== tab, 'Move must rebind the new tab object');
+    assert(lost, 'Move must pause updates when the stable API cannot prove ownership');
+    await browser.open('browser-test', 'http://127.0.0.1:7357/');
+    assert(browser.currentTab && browser.currentTab !== tab, 'Explicit open must rebind the target');
     await browser.refresh('browser-test');
     await vscode.window.tabGroups.close(browser.currentTab!);
     await wait(250);
