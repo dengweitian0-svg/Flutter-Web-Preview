@@ -10,3 +10,9 @@
 - `npm audit --omit=dev --audit-level=high`：0 vulnerabilities。
 
 后续仍需验证真实 Flutter 链路、浏览器归属追踪、关闭后端口释放、版本兼容和 VSIX 安装。
+
+## 核心状态机与更新调度
+
+- 纯转换函数及副作用执行器已实现，核心没有 vscode 或 child_process 依赖。
+- `npm run check`、`npm run lint`、`npm test` 通过，15 个状态与调度测试覆盖启动条件、重复 Run、编译失败、pending 合并、关闭优先级、旧绑定隔离、清理失败及超时。
+- 外围适配器尚未接入；这些测试证明核心行为，不代替真实 Flutter 和浏览器验收。

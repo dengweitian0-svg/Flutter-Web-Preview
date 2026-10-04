@@ -20,7 +20,7 @@
     "build": "node scripts/build.mjs",
     "watch": "node scripts/build.mjs --watch",
     "check": "tsc --noEmit",
-    "lint": "eslint src test scripts",
+    "lint": "eslint src test/unit test/extension scripts",
     "test": "vitest run",
     "test:extension": "npm run build && node scripts/test-extension.mjs",
     "vscode:prepublish": "npm run check && npm run build",
