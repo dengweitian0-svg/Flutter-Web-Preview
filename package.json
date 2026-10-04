@@ -1,0 +1,41 @@
+{
+  "name": "flutter-web-preview",
+  "displayName": "Flutter Web Preview",
+  "description": "Preview Flutter Web inside VS Code, update on Dart save, and stop when the preview closes.",
+  "version": "0.1.0",
+  "publisher": "wende",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/dengweitian0-svg/Flutter-Web-Preview.git" },
+  "engines": { "vscode": "^1.140.0" },
+  "categories": ["Other"],
+  "keywords": ["flutter", "dart", "web", "preview"],
+  "main": "./dist/extension.js",
+  "extensionKind": ["workspace"],
+  "capabilities": {
+    "untrustedWorkspaces": { "supported": false, "description": "Preview runs the workspace's Flutter application." },
+    "virtualWorkspaces": { "supported": false }
+  },
+  "activationEvents": ["onLanguage:dart"],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "check": "tsc --noEmit",
+    "lint": "eslint src test scripts",
+    "test": "vitest run",
+    "test:extension": "npm run build && node scripts/test-extension.mjs",
+    "vscode:prepublish": "npm run check && npm run build",
+    "package": "vsce package --out artifacts/flutter-web-preview-0.1.0.vsix"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/vscode": "1.140.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.0.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.0.0",
+    "esbuild": "^0.27.0",
+    "vitest": "^5.0.3"
+  },
+  "dependencies": { "yaml": "^2.8.0" }
+}
