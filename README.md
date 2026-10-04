@@ -1,67 +1,130 @@
 # Flutter Web Preview
 
-在 VS Code 右侧预览 Flutter Web。首次点击运行后，保存 Dart 文件即可自动重新编译并刷新页面；关闭预览标签会自动停止 Flutter 服务。
+**在 VS Code 右侧预览 Flutter Web：启动一次，保存更新，关闭停止。**
 
-## 安装与使用
+Flutter Web Preview 是面向本地 Windows 开发的 VS Code 扩展。它将 Flutter 应用打开在编辑器内置的 Integrated Browser 中，让你在修改 Dart 界面时直接查看结果，无需切换到外部 Chrome。
 
-要求本地 Windows、VS Code 1.140.0 或以上，以及 Flutter 3.35 系列或以上的 stable SDK。Flutter 应用需要 `pubspec.yaml`、`lib/` 和 `web/`。首次使用请先在项目中完成 `flutter pub get`。
+- **保存即更新**：支持手动保存和 Auto Save；连续保存会合并更新请求，编译完成后刷新页面。
+- **预览管理服务**：首次手动启动，关闭预览标签后停止对应 Flutter 服务并释放端口；之后保存文件不会重新启动。
+- **编译失败可恢复**：保留上一次成功的页面，修复错误并保存后继续更新；状态栏和 Output 提供运行状态与日志。
 
-1. 在 VS Code 命令面板执行 **Extensions: Install from VSIX...**，选择 `flutter-web-preview-0.1.0.vsix`。
-2. 打开并信任 Flutter 项目。
-3. 点击 Dart 顶层 `main()` 上方的 **Run Web Preview**，或执行 **Flutter Web Preview: Run Web Preview**。
-4. 正常修改并保存 Dart 文件，右侧浏览器自动显示最新内容。Auto Save 同样支持。
-5. 关闭预览标签结束会话；再次点击 Run 恢复。
+[快速开始](#快速开始) · [配置](#配置) · [常见问题与支持范围](#常见问题与支持范围) · [开发与验证](#开发与验证) · [English](#english-quick-start)
 
-插件使用 `web-server` 设备，不启动外部 Chrome。更新采用重新编译加页面刷新，计数器、内存状态可能重置。需要断点或完整调试时继续使用 Dart/Flutter 官方扩展。
+## 快速开始
+
+### 环境要求
+
+| 环境 | 要求 |
+| --- | --- |
+| 操作系统 | 本地 Windows |
+| 编辑器 | VS Code 1.140.0 或以上，支持 Integrated Browser |
+| Flutter | 3.35 系列或以上的 stable SDK |
+| 项目 | Flutter 应用，包含 `pubspec.yaml`、`lib/` 和 `web/`，并已信任工作区 |
+
+首次运行前，在你的 Flutter 项目根目录执行：
+
+```powershell
+flutter pub get
+```
+
+### 安装扩展
+
+当前使用 VSIX 安装。已有 `flutter-web-preview-0.1.0.vsix` 时，在 VS Code 命令面板执行 **Extensions: Install from VSIX...** 并选择该文件。
+
+也可以从源码生成安装包。下载或克隆本仓库后，在仓库根目录执行（建议使用 Node.js 24，与 CI 配置一致）：
+
+```powershell
+npm ci
+npm run package
+```
+
+安装包输出到 `artifacts/flutter-web-preview-0.1.0.vsix`。Marketplace 发布准备见[发布说明](docs/marketplace.md)。
+
+### 开始预览
+
+1. 在 VS Code 中打开并信任你的 Flutter Web 项目。
+2. 打开入口 Dart 文件，点击顶层 `main()` 上方的 **Run Web Preview**；也可在命令面板执行 **Flutter Web Preview: Run Web Preview**。
+3. 修改并保存当前项目中的 Dart 文件，右侧预览在编译成功后自动刷新。
+4. 关闭预览标签结束会话，再次点击 **Run Web Preview** 可重新启动。
+
+多根工作区支持选择项目，每个 VS Code 窗口同时运行一个预览。保存其他项目的文件不会更新当前预览。
+
+更新采用**重新编译并刷新整个页面**，计数器等内存状态可能重置。断点和完整调试请使用 Dart/Flutter 官方扩展。
+
+## 保存前后
+
+以下截图来自仓库测试样例，展示保存 Dart 修改前后的实际 Flutter 页面。完整验证过程见[验证记录](docs/verification.md)。
+
+<table>
+  <tr>
+    <th>保存前</th>
+    <th>保存后</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/preview-before.png" alt="保存前，Flutter 示例页面显示 Preview version 1" width="220"></td>
+    <td><img src="docs/images/preview-after.png" alt="保存后，Flutter 示例页面显示 Preview version 2" width="220"></td>
+  </tr>
+</table>
 
 ## 命令
 
-所有命令位于命令面板的 **Flutter Web Preview** 分类：
+在命令面板中搜索 **Flutter Web Preview**，或点击状态栏打开操作菜单。
 
 | 命令 | 作用 |
 | --- | --- |
-| Run Web Preview | 启动，或显示现有预览 |
-| Stop Web Preview | 停止服务并清理会话 |
-| Restart Web Preview | 重读启动配置并重新启动 |
-| Reload Web Preview | 手动重新编译并刷新 |
-| Open Preview Browser | 打开或重新绑定预览标签 |
-| Reload Preview Browser | 仅刷新浏览器 |
-| Show Output | 查看运行和编译日志 |
-
-状态栏显示当前生命周期。编译失败时保留旧页面；修复并保存后继续更新。
+| Run Web Preview | 启动预览，或显示现有预览 |
+| Stop Web Preview | 停止 Flutter 服务并清理会话 |
+| Restart Web Preview | 重新读取启动配置并重启 |
+| Reload Web Preview | 手动重新编译并刷新页面 |
+| Open Preview Browser | 打开预览，或显式重新绑定预览标签 |
+| Reload Preview Browser | 仅刷新浏览器页面，不重新编译 |
+| Show Output | 查看 Flutter 运行、编译及扩展日志 |
 
 ## 配置
 
+默认配置可直接使用。若未找到 Flutter，在 VS Code 的 `settings.json` 中指定 **SDK 根目录**，该目录应包含 `bin/flutter.bat`：
+
 ```json
 {
-  "flutterWebPreview.flutterSdkPath": "D:\\flutter\\flutter",
-  "flutterWebPreview.entrypoint": "lib/main.dart",
-  "flutterWebPreview.port": 7357,
-  "flutterWebPreview.reloadOnSave": true,
-  "flutterWebPreview.reloadDelay": 300,
-  "flutterWebPreview.startupTimeout": 180000,
-  "flutterWebPreview.reloadTimeout": 30000,
-  "flutterWebPreview.showCodeLens": true
+  "flutterWebPreview.flutterSdkPath": "D:\\flutter\\flutter"
 }
 ```
 
-SDK 路径可以省略，插件依次查找自己的配置、`dart.flutterSdkPath` 和 PATH。端口、SDK、默认入口及启动超时在下次启动或 Restart 时生效；其他配置按其行为即时或下一次更新生效。CodeLens 和活动入口文件优先于默认入口配置。
+SDK 查找顺序为 `flutterWebPreview.flutterSdkPath`、`dart.flutterSdkPath`、`PATH`。
 
-支持多根工作区的项目选择，每个窗口一次运行一个项目。保存其他项目的文件不会触发当前预览更新。
+| 配置项（前缀为 `flutterWebPreview.`） | 默认值 | 说明 |
+| --- | --- | --- |
+| `flutterSdkPath` | `""` | Flutter SDK 根目录，留空则继续查找 |
+| `entrypoint` | `"lib/main.dart"` | 相对于 Flutter 项目根目录的默认入口 |
+| `port` | `7357` | 本地服务端口，范围为 1024–65535 |
+| `reloadOnSave` | `true` | 保存 Dart 文件时自动更新 |
+| `reloadDelay` | `300` | 保存防抖等待时间，单位毫秒 |
+| `startupTimeout` | `180000` | 启动超时，单位毫秒 |
+| `reloadTimeout` | `30000` | 重新编译超时，单位毫秒 |
+| `showCodeLens` | `true` | 在顶层 `main()` 上方显示运行入口 |
 
-## 浏览器标签与常见问题
+SDK、端口、默认入口和启动超时在下次启动或 **Restart Web Preview** 时生效；其他配置即时生效或在下一次对应操作时读取。通过 CodeLens 启动的文件，或活动编辑器中包含顶层 `main()` 的文件，优先于默认入口配置。
 
-- **关闭预览**：自动停止服务，释放端口。关闭后保存不会自动启动。
-- **切换或隐藏预览**：保持运行。
-- **标签身份变化**：Integrated Browser 的公开 API 缺少稳定标签身份。跨组移动或复杂标签变化后，无法确认归属时暂停自动更新；使用 Open Preview Browser 显式重新绑定，或 Stop 结束会话。插件不会猜测并刷新其他浏览器标签。
-- **端口被占用**：修改 `flutterWebPreview.port` 后重新运行；插件不会结束占用端口的其他进程。
-- **找不到 Flutter**：将 `flutterSdkPath` 设置为包含 `bin/flutter.bat` 的 SDK 根目录。
-- **缺少 Web 支持**：在项目中添加 Flutter Web 支持，再启动预览。
-- **编译超时或协议失效**：插件停止并清理当前会话。查看 Output 后再次 Run。
-- **资源或 pubspec 更新**：Dart 保存自动更新不处理所有配置变化，必要时重新处理依赖并 Restart。
-- **运行环境**：首版不支持远程工作区、浏览器版 VS Code、macOS、Linux、WebAssembly 或完整调试。
+## 常见问题与支持范围
 
-## 开发
+| 情况 | 处理方式或预期行为 |
+| --- | --- |
+| 切换编辑器或隐藏预览 | 服务保持运行 |
+| 跨编辑组移动后暂停更新 | 标签身份可能变化；执行 **Open Preview Browser** 显式重新绑定，或 **Stop Web Preview** 结束会话 |
+| 端口被占用 | 修改 `port` 后重新启动；扩展不会结束占用端口的其他进程 |
+| 找不到 Flutter SDK | 设置 `flutterSdkPath` 为包含 `bin/flutter.bat` 的 SDK 根目录 |
+| 项目缺少 Web 支持 | 为应用添加 Flutter Web 支持，确认存在 `web/` 后再启动 |
+| Dart 编译错误 | 查看 **Show Output**，修复并保存；旧页面保留 |
+| 启动、编译超时或协议失效 | 当前会话停止并清理；查看 **Show Output** 后再次运行 |
+| 修改资源或 `pubspec.yaml` | 按需执行 `flutter pub get`，再 **Restart Web Preview** |
+
+Integrated Browser 的公开 API 缺少稳定的标签身份。遇到无法确认预览归属的标签变化时，扩展暂停自动更新，需要显式重新绑定；不要将跨组移动后无操作继续更新视为已支持能力。
+
+当前版本不支持远程工作区、浏览器版 VS Code、macOS、Linux、WebAssembly 或完整调试。服务使用 `web-server` 设备并绑定 `127.0.0.1`。
+
+## 开发与验证
+
+在仓库根目录执行：
 
 ```powershell
 npm ci
@@ -71,25 +134,37 @@ npm test
 npm run build
 ```
 
-按 F5 启动 Extension Development Host。测试样例位于 `test/fixtures/flutter_app`，先为它运行 `flutter pub get`。
+测试样例位于 `test/fixtures/flutter_app`。在该目录先执行 `flutter pub get`，然后回到仓库，在 VS Code 中按 **F5** 启动 Extension Development Host。
 
-真实 VS Code 验证：
+<details>
+<summary>真实 VS Code 与 Flutter 的端到端验证</summary>
+
+在仓库根目录使用 PowerShell 执行，按本机安装位置修改路径：
 
 ```powershell
-$env:VSCODE_EXECUTABLE = 'E:\Microsoft VS Code\Code.exe'
+$env:VSCODE_EXECUTABLE = 'C:\Program Files\Microsoft VS Code\Code.exe'
+$env:FLUTTER_SDK_PATH = 'D:\flutter\flutter'
 $env:PREVIEW_TEST_MODE = 'e2e'
 $env:PREVIEW_STRESS_CYCLES = '20'
 npm run test:extension
 ```
 
-可选 `FLUTTER_SDK_PATH` 指定测试 SDK，`PREVIEW_TEST_MODE=browser` 运行浏览器适配器测试。测试创建独立的 VS Code 配置目录，并在 finally 中恢复样例 Dart 内容；截图和结果在 `artifacts/`。CDP 调试端口仅用于测试，不用于扩展运行。
+`VSCODE_EXECUTABLE` 可省略，由测试工具下载 VS Code；`FLUTTER_SDK_PATH` 可用于指定测试 SDK。将 `PREVIEW_TEST_MODE` 设为 `browser` 可单独测试浏览器适配器。
 
-打包：`npm run package`。正式 Marketplace 上架需要拥有发布者账号，仓库中的 publisher 元数据不表示账号已经注册。
+测试使用仓库 `.cache/` 下的独立 VS Code 配置目录，结束时恢复样例 Dart 内容，截图和运行结果写入 `artifacts/`。CDP 调试端口仅用于测试。
+
+</details>
+
+本地验证记录包含 stable SDK、保存更新、编译失败恢复、端口释放、VSIX 安装和生命周期压力测试。具体结果及尚未满足的验收项见[验证记录](docs/verification.md)；版本变更见 [CHANGELOG](CHANGELOG.md)。
 
 ## English quick start
 
-On local Windows, install the VSIX into VS Code 1.140 or later. Open a trusted Flutter Web project, click **Run Web Preview** above `main()`, then save Dart files to recompile and refresh automatically. Close the preview tab to stop its Flutter server. Runtime state can reset. If a tab move makes ownership unavailable, explicitly use **Open Preview Browser** to bind it again. Flutter is resolved from settings or PATH.
+Preview Flutter Web inside VS Code on **local Windows**. Use VS Code **1.140.0+** and a Flutter **3.35-series or later stable SDK**.
 
-## License
+Install the VSIX, open a trusted Flutter Web project, and run `flutter pub get`. Click **Run Web Preview** above the top-level `main()`, then save Dart files to recompile and refresh automatically. Close the preview tab to stop its Flutter server.
 
-MIT.
+To build the VSIX from this repository, run `npm ci` followed by `npm run package`; the package is written to `artifacts/`. Page state may reset on refresh. If moving a tab pauses updates, use **Open Preview Browser** to explicitly bind it again. Flutter is resolved from extension settings, `dart.flutterSdkPath`, or `PATH`.
+
+## 许可证
+
+[MIT](LICENSE) · 作者：wende · [第三方声明](THIRD_PARTY_NOTICES.md)
