@@ -28,3 +28,11 @@
 - `PREVIEW_TEST_MODE=browser` 的真实 Extension Host 测试通过：绑定实际标签、刷新、跨组移动后保持绑定、关闭后发出一次关闭事件、关闭后刷新不创建标签。
 - 浏览器刷新采用记录标签的编辑组和索引定位，不使用可能创建新标签的 open 命令兜底。
 - 标签移动和未知输入的协调逻辑另有单元测试；多个替代标签的结构变化视为归属不明确，不能据此终止进程。
+
+## 命令、CodeLens 与保存后的真实页面更新
+
+- 35 个单元测试、类型检查、lint 和构建通过。
+- 真实 Extension Host 中通过注册命令运行扩展，CodeLens 能在 main 上提供 Run，正常编辑器保存会自动触发编译。
+- 使用浏览器 CDP 读取 Flutter 的语义树，验证页面依次显示 Preview version 1、2、3；版本 2 的截图已目视核对。截图为 `artifacts/preview-before.png`、`artifacts/preview-after.png`。
+- 编译错误时保留版本 2 页面；修复并保存后显示版本 3。移动预览保持会话，关闭后停止并释放端口，随后保存不重启。
+- 记录：`artifacts/e2e-checks.json`、`artifacts/e2e-test.log`。本轮使用 master SDK，stable 兼容与压力验证仍待完成。

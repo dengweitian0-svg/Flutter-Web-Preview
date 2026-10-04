@@ -7,4 +7,4 @@ artifacts/
 test/fixtures/flutter_app/.dart_tool/
 test/fixtures/flutter_app/build/
 test/fixtures/flutter_app/.flutter-plugins-dependencies
-
+test/fixtures/flutter_app/.vscode/

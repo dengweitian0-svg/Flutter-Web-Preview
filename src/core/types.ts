@@ -37,6 +37,7 @@ export type SessionEvent =
   | { type: 'STOP'; reason?: string }
   | { type: 'RESTART' }
   | { type: 'SAVE' }
+  | { type: 'CANCEL_SAVE' }
   | { type: 'UPDATE'; reason: 'save' | 'manual' }
   | { type: 'OPEN_BROWSER' | 'REFRESH_BROWSER' }
   | { type: 'APP_ID'; sessionId: string; appId: string }

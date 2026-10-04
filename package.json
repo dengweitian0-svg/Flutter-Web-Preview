@@ -16,6 +16,31 @@
     "virtualWorkspaces": { "supported": false }
   },
   "activationEvents": ["onLanguage:dart"],
+  "contributes": {
+    "languages": [{ "id": "dart", "aliases": ["Dart", "dart"], "extensions": [".dart"] }],
+    "commands": [
+      { "command": "flutterWebPreview.run", "title": "Run Web Preview", "category": "Flutter Web Preview" },
+      { "command": "flutterWebPreview.stop", "title": "Stop Web Preview", "category": "Flutter Web Preview" },
+      { "command": "flutterWebPreview.restart", "title": "Restart Web Preview", "category": "Flutter Web Preview" },
+      { "command": "flutterWebPreview.reload", "title": "Reload Web Preview", "category": "Flutter Web Preview" },
+      { "command": "flutterWebPreview.openBrowser", "title": "Open Preview Browser", "category": "Flutter Web Preview" },
+      { "command": "flutterWebPreview.reloadBrowser", "title": "Reload Preview Browser", "category": "Flutter Web Preview" },
+      { "command": "flutterWebPreview.showOutput", "title": "Show Output", "category": "Flutter Web Preview" }
+    ],
+    "configuration": {
+      "title": "Flutter Web Preview",
+      "properties": {
+        "flutterWebPreview.flutterSdkPath": { "type": "string", "default": "", "scope": "machine-overridable", "description": "Flutter SDK root. Falls back to dart.flutterSdkPath and PATH." },
+        "flutterWebPreview.entrypoint": { "type": "string", "default": "lib/main.dart", "scope": "resource", "description": "Default entrypoint relative to the Flutter project." },
+        "flutterWebPreview.port": { "type": "integer", "default": 7357, "minimum": 1024, "maximum": 65535, "scope": "resource", "description": "Local Flutter Web server port. Changes apply on next start." },
+        "flutterWebPreview.reloadOnSave": { "type": "boolean", "default": true, "scope": "resource", "description": "Automatically recompile and refresh on Dart save. Page state may reset." },
+        "flutterWebPreview.reloadDelay": { "type": "integer", "default": 300, "minimum": 0, "maximum": 60000, "scope": "resource", "description": "Debounce delay in milliseconds." },
+        "flutterWebPreview.startupTimeout": { "type": "integer", "default": 180000, "minimum": 1000, "maximum": 3600000, "scope": "resource", "description": "Flutter startup timeout in milliseconds." },
+        "flutterWebPreview.reloadTimeout": { "type": "integer", "default": 30000, "minimum": 1000, "maximum": 3600000, "scope": "resource", "description": "Compilation timeout in milliseconds." },
+        "flutterWebPreview.showCodeLens": { "type": "boolean", "default": true, "scope": "resource", "description": "Show Run Web Preview above top-level Dart main declarations." }
+      }
+    }
+  },
   "scripts": {
     "build": "node scripts/build.mjs",
     "watch": "node scripts/build.mjs --watch",

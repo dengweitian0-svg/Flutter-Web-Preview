@@ -12,7 +12,7 @@ export class PreviewSessionController {
   private stopTask?: Promise<void>;
   private disposed = false;
   readonly changes = new Signal<Snapshot>();
-  constructor(private readonly runtime: FlutterRuntime, private readonly browser: PreviewBrowser, private readonly report: (message: string) => void, private readonly log: (message: string) => void = () => {}) {
+  constructor(private readonly runtime: FlutterRuntime, private readonly browser: PreviewBrowser, private readonly report: (message: string) => void, private readonly log: (message: string) => void = () => {}, private readonly reloadTimeout: (snapshot: Snapshot) => number = snapshot => snapshot.context.currentSpec?.reloadTimeout ?? 30000) {
     this.subscriptions = [runtime.events.subscribe(e => this.dispatch(e)), browser.events.subscribe(e => this.dispatch(e))];
   }
   get current(): Snapshot { return this.snapshot; }
@@ -49,6 +49,10 @@ export class PreviewSessionController {
     clearTimeout(this.debounce); clearTimeout(this.startup);
     this.debounce = undefined; this.startup = undefined;
   }
+  cancelSavedUpdates(): void {
+    clearTimeout(this.debounce); this.debounce = undefined;
+    this.dispatch({ type: 'CANCEL_SAVE' });
+  }
   private execute(effect: Effect): void {
     switch (effect.type) {
       case 'CLEAR_TIMERS': this.clearTimers(); break;
@@ -61,7 +65,7 @@ export class PreviewSessionController {
       }
       case 'STOP': this.stopTask = this.cleanup(effect.sessionId); break;
       case 'COMPILE':
-        void this.runtime.recompile(effect.session.sessionId, effect.reason, effect.session.spec.reloadTimeout).then(result => this.dispatch({ type: 'COMPILED', sessionId: effect.session.sessionId, operationId: effect.operationId, ...result }), error => this.dispatch({ type: 'FATAL', sessionId: effect.session.sessionId, message: String(error) }));
+        void this.runtime.recompile(effect.session.sessionId, effect.reason, this.reloadTimeout(this.snapshot)).then(result => this.dispatch({ type: 'COMPILED', sessionId: effect.session.sessionId, operationId: effect.operationId, ...result }), error => this.dispatch({ type: 'FATAL', sessionId: effect.session.sessionId, message: String(error) }));
         break;
       case 'OPEN':
         void this.browser.open(effect.sessionId, effect.url).catch(error => this.dispatch({ type: 'BROWSER_ERROR', sessionId: effect.sessionId, message: String(error) }));

@@ -77,6 +77,9 @@ export function transition(snapshot: Snapshot, event: SessionEvent): Transition 
     case 'SAVE':
       if (state.kind === 'starting' || state.kind === 'updating' || state.kind === 'running') context.pending = true;
       break;
+    case 'CANCEL_SAVE':
+      context.pending = false;
+      break;
     case 'UPDATE':
       if (state.kind === 'starting' || state.kind === 'updating') context.pending = true;
       else if (state.kind === 'running' && (context.browserOpen || event.reason === 'manual')) {
