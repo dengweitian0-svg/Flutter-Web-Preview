@@ -78,6 +78,13 @@ describe('owned browser log sessions', () => {
     await adapter.release('preview-1');
     expect(debug.stopDebugging).toHaveBeenCalledTimes(2); expect(events).toHaveBeenCalledTimes(1);
   });
+  it('coalesces overlapping cleanup requests while VS Code is stopping a session', async () => {
+    const { adapter } = setup(); await adapter.attach('preview-1', 'tab-1', 'http://127.0.0.1:7357/');
+    let finish!: () => void;
+    debug.stopDebugging.mockImplementation(() => new Promise<void>(resolve => { finish = resolve; }));
+    const first = adapter.release('preview-1'); const second = adapter.release('preview-1');
+    expect(debug.stopDebugging).toHaveBeenCalledTimes(1); finish(); await Promise.all([first, second]);
+  });
   it('rebinds to a new tab and ignores a late old termination', async () => {
     const { adapter, events } = setup(); await adapter.attach('preview-1', 'tab-1', 'http://127.0.0.1:7357/');
     const old = started[0]!;

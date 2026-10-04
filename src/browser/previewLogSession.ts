@@ -6,7 +6,7 @@ import type { BrowserEvent } from '../core/types';
 interface Attachment {
   token: string; sessionId: string; bindingId: string; url: string;
   cancelled: boolean; ready: boolean; terminated: boolean; released?: boolean;
-  debugSession?: vscode.DebugSession; task?: Promise<void>;
+  debugSession?: vscode.DebugSession; task?: Promise<void>; stopping?: Promise<void>;
 }
 
 /** Owns only the browser logging sessions created by this preview adapter. */
@@ -113,8 +113,9 @@ export class PreviewLogSession {
   private async stop(session: vscode.DebugSession): Promise<void> { await vscode.debug.stopDebugging(session); }
   private async stopAttachment(attachment: Attachment): Promise<void> {
     if (!attachment.debugSession || attachment.terminated || attachment.released) return;
-    await this.stop(attachment.debugSession);
-    attachment.released = true;
+    if (!attachment.stopping) attachment.stopping = this.stop(attachment.debugSession).then(() => { attachment.released = true; });
+    try { await attachment.stopping; }
+    catch (error) { attachment.stopping = undefined; throw error; }
   }
 
   async release(sessionId: string): Promise<void> {
