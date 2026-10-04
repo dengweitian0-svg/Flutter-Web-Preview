@@ -16,3 +16,9 @@
 - 纯转换函数及副作用执行器已实现，核心没有 vscode 或 child_process 依赖。
 - `npm run check`、`npm run lint`、`npm test` 通过，15 个状态与调度测试覆盖启动条件、重复 Run、编译失败、pending 合并、关闭优先级、旧绑定隔离、清理失败及超时。
 - 外围适配器尚未接入；这些测试证明核心行为，不代替真实 Flutter 和浏览器验收。
+
+## Flutter 协议与进程适配器
+
+- machine 协议、请求 ID 关联、失败结果、超时及进程退出取消已实现；Windows 启动器和受管理进程树停止已接入。
+- 在真实 VS Code 与本机 Flutter master SDK 上，启动、修改样例、收到成功编译响应、请求浏览器刷新、关闭标签后停止及端口释放测试通过。
+- 运行记录在 `artifacts/runtime-test.log` 和 `artifacts/runtime-test.json`。页面最终显示内容仍需视觉/DOM 验证，stable SDK 兼容验证仍待完成。
