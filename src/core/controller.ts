@@ -65,7 +65,12 @@ export class PreviewSessionController {
       }
       case 'STOP': this.stopTask = this.cleanup(effect.sessionId); break;
       case 'COMPILE':
-        void this.runtime.recompile(effect.session.sessionId, effect.reason, this.reloadTimeout(this.snapshot)).then(result => this.dispatch({ type: 'COMPILED', sessionId: effect.session.sessionId, operationId: effect.operationId, ...result }), error => this.dispatch({ type: 'FATAL', sessionId: effect.session.sessionId, message: String(error) }));
+        try {
+          const timeout = this.reloadTimeout(this.snapshot);
+          void this.runtime.recompile(effect.session.sessionId, effect.reason, timeout).then(result => this.dispatch({ type: 'COMPILED', sessionId: effect.session.sessionId, operationId: effect.operationId, ...result }), error => this.dispatch({ type: 'FATAL', sessionId: effect.session.sessionId, message: String(error) }));
+        } catch (error) {
+          this.dispatch({ type: 'COMPILED', sessionId: effect.session.sessionId, operationId: effect.operationId, code: 1, message: String(error) });
+        }
         break;
       case 'OPEN':
         void this.browser.open(effect.sessionId, effect.url).catch(error => this.dispatch({ type: 'BROWSER_ERROR', sessionId: effect.sessionId, message: String(error) }));

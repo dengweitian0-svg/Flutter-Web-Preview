@@ -31,6 +31,9 @@ export function activate(context: vscode.ExtensionContext): PreviewApi {
     return numericSetting(vscode.workspace.getConfiguration('flutterWebPreview', resource), 'reloadTimeout', 30000, 1000, 3600000);
   });
   controller = session;
+  context.subscriptions.push(preview.events.subscribe(event => {
+    if (event.type === 'BROWSER_CLOSED' && event.sessionId === sessionId(session.current.state) && event.bindingId === session.current.context.bindingId) intent++;
+  }));
   const status = vscode.window.createStatusBarItem('flutterWebPreview.status', vscode.StatusBarAlignment.Left, 25);
   status.command = 'flutterWebPreview.actions';
   const updateStatus = () => {
@@ -46,7 +49,7 @@ export function activate(context: vscode.ExtensionContext): PreviewApi {
   const register = (name: string, callback: (...args: unknown[]) => unknown) => {
     context.subscriptions.push(vscode.commands.registerCommand(`flutterWebPreview.${name}`, async (...args: unknown[]) => {
       try { return await callback(...args); }
-      catch (error) { const message = error instanceof Error ? error.message : String(error); log(message); await vscode.window.showErrorMessage(message, 'Show Output').then(choice => { if (choice) output.show(true); }); }
+      catch (error) { const message = error instanceof Error ? error.message : String(error); log(message); void vscode.window.showErrorMessage(message, 'Show Output').then(choice => { if (choice) output.show(true); }); throw error; }
     }));
   };
   register('run', async uri => {
@@ -57,9 +60,13 @@ export function activate(context: vscode.ExtensionContext): PreviewApi {
   });
   register('stop', async () => { intent++; await session.stop(); });
   register('restart', async () => {
-    intent++;
-    if (session.current.context.currentSpec) session.dispatch({ type: 'RESTART' });
-    else await vscode.commands.executeCommand('flutterWebPreview.run');
+    const request = ++intent;
+    const current = session.current.context.currentSpec;
+    if (!current) { await vscode.commands.executeCommand('flutterWebPreview.run'); return; }
+    const spec = await resolveLaunch(vscode.Uri.file(current.entrypoint));
+    if (spec && request === intent) {
+      session.dispatch({ type: 'RESTART', spec });
+    }
   });
   register('reload', () => {
     if (['stopped', 'failed', 'stopping'].includes(session.current.state.kind)) throw new Error('Run Web Preview before requesting an update.');

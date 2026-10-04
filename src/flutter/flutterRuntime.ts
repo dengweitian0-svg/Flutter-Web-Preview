@@ -67,7 +67,9 @@ export class FlutterProcessRuntime implements FlutterRuntime {
             break;
           case 'app.webLaunchUrl': {
             if (typeof params.url !== 'string') break;
-            const url = new URL(params.url);
+            let url: URL;
+            try { url = new URL(params.url); }
+            catch { this.events.emit({ type: 'FATAL', sessionId: session.id, message: 'Flutter returned an invalid preview URL.' }); break; }
             if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(url.hostname) || Number(url.port) !== spec.port) {
               this.events.emit({ type: 'FATAL', sessionId: session.id, message: 'Flutter returned an unexpected preview URL.' }); break;
             }

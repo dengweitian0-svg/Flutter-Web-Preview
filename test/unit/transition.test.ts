@@ -86,4 +86,12 @@ describe('session transitions', () => {
     expect(run?.type).toBe('DISPATCH');
     if (run?.type === 'DISPATCH') expect(step(clean, run.event).state).toMatchObject({ kind: 'starting', sessionId: 'preview-2' });
   });
+  it('restart accepts fresh configuration both while running and after stop', () => {
+    const updated = { ...spec, port: 7400, sdkPath: 'D:/new-sdk' };
+    const restarting = step(ready(), { type: 'RESTART', spec: updated });
+    expect(restarting.context.nextSpec).toEqual(updated);
+    const stopped = step(step(ready(), { type: 'STOP' }), { type: 'CLEANED', sessionId: 'preview-1' });
+    const start = step(stopped, { type: 'RESTART', spec: updated });
+    expect(start.state).toMatchObject({ kind: 'starting', spec: updated });
+  });
 });

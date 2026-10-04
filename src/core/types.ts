@@ -35,7 +35,7 @@ export function sessionId(state: SessionState): string | undefined {
 export type SessionEvent =
   | { type: 'RUN'; spec: LaunchSpec }
   | { type: 'STOP'; reason?: string }
-  | { type: 'RESTART' }
+  | { type: 'RESTART'; spec?: LaunchSpec }
   | { type: 'SAVE' }
   | { type: 'CANCEL_SAVE' }
   | { type: 'UPDATE'; reason: 'save' | 'manual' }
@@ -45,7 +45,7 @@ export type SessionEvent =
   | { type: 'STARTED'; sessionId: string }
   | { type: 'BROWSER_OPENED'; sessionId: string; bindingId: string }
   | { type: 'BROWSER_CLOSED'; sessionId: string; bindingId: string }
-  | { type: 'BROWSER_ERROR'; sessionId: string; message: string }
+  | { type: 'BROWSER_ERROR'; sessionId: string; message: string; bindingLost?: boolean }
   | { type: 'COMPILED'; sessionId: string; operationId: number; code: number; message?: string }
   | { type: 'FATAL'; sessionId: string; message: string }
   | { type: 'CLEANED'; sessionId: string }

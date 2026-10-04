@@ -5,11 +5,16 @@ describe('browser tab identity tracking', () => {
     const tab = {}; const other = {}; const tracker = new TabTracker<object>(); tracker.bind(tab, [tab, other]);
     tracker.observe([other, tab], () => true, 0); expect(tracker.reconcile([other, tab])).toBe('present');
   });
-  it('transfers the binding when a move opens a replacement before closing the old tab', () => {
+  it('does not infer ownership when a move opens a replacement before closing the old tab', () => {
     const original = {}; const moved = {}; const tracker = new TabTracker<object>(); tracker.bind(original, [original]);
     tracker.observe([original, moved], () => true, 0); tracker.observe([moved], () => true, 30);
-    expect(tracker.reconcile([moved])).toBe('moved'); expect(tracker.current).toBe(moved);
+    expect(tracker.reconcile([moved])).toBe('ambiguous'); expect(tracker.current).toBe(original);
     tracker.observe([], () => true, 100); expect(tracker.reconcile([])).toBe('closed');
+  });
+  it('never adopts an unrelated unknown-input tab opened immediately before closing the preview', () => {
+    const original = {}; const unrelated = {}; const tracker = new TabTracker<object>(); tracker.bind(original, [original]);
+    tracker.observe([original, unrelated], () => true, 0); tracker.observe([unrelated], () => true, 100);
+    expect(tracker.reconcile([unrelated])).toBe('ambiguous'); expect(tracker.current).toBe(original);
   });
   it('does not use an unrelated tab opened long before the close as a replacement', () => {
     const original = {}; const other = {}; const tracker = new TabTracker<object>(); tracker.bind(original, [original]);

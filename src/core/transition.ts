@@ -47,9 +47,9 @@ export function transition(snapshot: Snapshot, event: SessionEvent): Transition 
       stop('stopped');
       break;
     case 'RESTART':
-      if (!context.currentSpec) break;
-      if (state.kind === 'stopped' || state.kind === 'failed') start(context.currentSpec);
-      else { context.nextSpec = context.currentSpec; stop('stopped'); }
+      if (!event.spec && !context.currentSpec) break;
+      if (state.kind === 'stopped' || state.kind === 'failed') start(event.spec ?? context.currentSpec!);
+      else { context.nextSpec = event.spec ?? context.currentSpec; stop('stopped'); }
       break;
     case 'APP_ID':
       if (state.kind === 'starting') { context.appId = event.appId; ready(); }
@@ -104,6 +104,7 @@ export function transition(snapshot: Snapshot, event: SessionEvent): Transition 
       break;
     case 'BROWSER_ERROR':
       if (state.kind !== 'stopping') {
+        if (event.bindingLost) context.browserOpen = false;
         if (state.kind === 'running') result.state = { ...state, lastError: event.message };
         effects.push({ type: 'REPORT', message: event.message });
       }

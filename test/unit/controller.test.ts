@@ -54,4 +54,17 @@ describe('update scheduling and cleanup', () => {
     expect(runtime.stop).toHaveBeenCalledTimes(1); expect(controller.current.state.kind).toBe('failed');
     await controller.dispose();
   });
+  it('invalid runtime configuration returns to running without losing the update queue', async () => {
+    const runtime = { events: new Signal<RuntimeEvent>(), start: vi.fn(async () => {}), recompile: vi.fn(async () => ({ code: 0 })), stop: vi.fn(async () => {}) };
+    const browser = { events: new Signal<BrowserEvent>(), open: vi.fn(async () => {}), refresh: vi.fn(async () => {}), release: vi.fn(async () => {}) };
+    const controller = new PreviewSessionController(runtime, browser, vi.fn(), vi.fn(), () => { throw new Error('Invalid reloadTimeout'); });
+    controller.dispatch({ type: 'RUN', spec });
+    runtime.events.emit({ type: 'APP_ID', sessionId: 'preview-1', appId: 'app' });
+    runtime.events.emit({ type: 'URL', sessionId: 'preview-1', url: 'http://127.0.0.1:7357' });
+    runtime.events.emit({ type: 'STARTED', sessionId: 'preview-1' });
+    controller.dispatch({ type: 'UPDATE', reason: 'manual' });
+    expect(controller.current.state).toMatchObject({ kind: 'running', lastError: 'Error: Invalid reloadTimeout' });
+    expect(runtime.recompile).not.toHaveBeenCalled();
+    await controller.dispose();
+  });
 });

@@ -36,8 +36,8 @@ export class IntegratedBrowser implements PreviewBrowser {
         binding.tracker.clear();
         this.events.emit({ type: 'BROWSER_CLOSED', sessionId: binding.sessionId, bindingId: binding.bindingId });
       } else if (result === 'ambiguous') {
-        this.events.emit({ type: 'BROWSER_ERROR', sessionId: binding.sessionId, message: 'Cannot identify the moved preview tab. Use Open Preview Browser to bind it again.' });
-      } else if (result === 'moved') this.log('Preview tab moved; session retained.\n');
+        this.events.emit({ type: 'BROWSER_ERROR', sessionId: binding.sessionId, bindingLost: true, message: 'Cannot identify the moved preview tab. Use Open Preview Browser to bind it again.' });
+      }
     }, 75);
   }
   async open(id: string, url: string): Promise<void> {
