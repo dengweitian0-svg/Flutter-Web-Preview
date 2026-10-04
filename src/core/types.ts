@@ -26,6 +26,8 @@ export interface SessionContext {
   currentSpec?: LaunchSpec;
   sequence: number;
   lastRefreshLatencyMs?: number;
+  logConsoleConnected?: boolean;
+  logError?: string;
 }
 export interface Snapshot { state: SessionState; context: SessionContext }
 export const initialSnapshot = (): Snapshot => ({ state: { kind: 'stopped' }, context: { started: false, browserOpen: false, pending: false, sequence: 0 } });
@@ -48,6 +50,8 @@ export type SessionEvent =
   | { type: 'BROWSER_CLOSED'; sessionId: string; bindingId: string }
   | { type: 'BROWSER_ERROR'; sessionId: string; message: string; bindingLost?: boolean }
   | { type: 'BROWSER_REFRESHED'; sessionId: string; bindingId: string; latencyMs?: number }
+  | { type: 'LOG_SESSION_STARTED' | 'LOG_SESSION_ENDED'; sessionId: string; bindingId: string }
+  | { type: 'LOG_SESSION_ERROR'; sessionId: string; bindingId: string; message: string }
   | { type: 'COMPILED'; sessionId: string; operationId: number; code: number; message?: string; completedAt?: number }
   | { type: 'FATAL'; sessionId: string; message: string }
   | { type: 'CLEANED'; sessionId: string }
@@ -67,7 +71,7 @@ export interface EventSource<T> { subscribe(listener: (event: T) => void): Dispo
 export interface CompileResult { code: number; message?: string; completedAt?: number }
 export type RuntimeEvent =
   | Extract<SessionEvent, { type: 'APP_ID' | 'URL' | 'STARTED' | 'FATAL' }>;
-export type BrowserEvent = Extract<SessionEvent, { type: 'BROWSER_OPENED' | 'BROWSER_CLOSED' | 'BROWSER_ERROR' | 'BROWSER_REFRESHED' }>;
+export type BrowserEvent = Extract<SessionEvent, { type: 'BROWSER_OPENED' | 'BROWSER_CLOSED' | 'BROWSER_ERROR' | 'BROWSER_REFRESHED' | 'LOG_SESSION_STARTED' | 'LOG_SESSION_ENDED' | 'LOG_SESSION_ERROR' }>;
 export interface FlutterRuntime {
   readonly events: EventSource<RuntimeEvent>;
   start(sessionId: string, spec: LaunchSpec): Promise<void>;

@@ -15,6 +15,26 @@ function ready(): Snapshot {
   return value;
 }
 describe('session transitions', () => {
+  it('stopping the owned log session stops the preview, but stale log events do not', () => {
+    expect(step(ready(), { type: 'LOG_SESSION_ENDED', sessionId: 'old', bindingId: 'tab-1' }).state.kind).toBe('running');
+    expect(step(ready(), { type: 'LOG_SESSION_ENDED', sessionId: 'preview-1', bindingId: 'old' }).state.kind).toBe('running');
+    const ended = step(ready(), { type: 'LOG_SESSION_ENDED', sessionId: 'preview-1', bindingId: 'tab-1' });
+    expect(ended.state.kind).toBe('stopping'); expect(ended.effects.map(effect => effect.type)).toEqual(['CLEAR_TIMERS', 'STOP']);
+    const restarting = step(ready(), { type: 'RESTART' });
+    expect(step(restarting, { type: 'LOG_SESSION_ENDED', sessionId: 'preview-1', bindingId: 'tab-1' }).context.nextSpec).toEqual(spec);
+  });
+  it('log failures preserve preview and compilation; successful reconnect clears the warning', () => {
+    const failure = step(ready(), { type: 'LOG_SESSION_ERROR', sessionId: 'preview-1', bindingId: 'tab-1', message: 'Attach failed' });
+    expect(failure.state.kind).toBe('running'); expect(failure.context.logError).toBe('Attach failed');
+    expect(failure.effects).toEqual([{ type: 'REPORT', message: 'Attach failed' }]);
+    const update = step(failure, { type: 'UPDATE', reason: 'save' });
+    expect(update.state.kind).toBe('updating');
+    const done = step(update, { type: 'COMPILED', sessionId: 'preview-1', operationId: 2, code: 0 });
+    expect(done.context.logError).toBe('Attach failed');
+    const connected = step(done, { type: 'LOG_SESSION_STARTED', sessionId: 'preview-1', bindingId: 'tab-1' });
+    expect(connected.context.logError).toBeUndefined(); expect(connected.context.logConsoleConnected).toBe(true);
+    expect(step(connected, { type: 'LOG_SESSION_ERROR', sessionId: 'preview-1', bindingId: 'old', message: 'Stale' }).effects).toEqual([]);
+  });
   it('opens URL before app.started, and only becomes ready when all startup facts arrive', () => {
     const start = step(initialSnapshot(), { type: 'RUN', spec });
     const url = step(start, { type: 'URL', sessionId: 'preview-1', url: 'http://127.0.0.1:7357' });

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { Signal } from '../core/signal';
 import type { BrowserEvent, PreviewBrowser } from '../core/types';
 import { TabTracker } from './tabTracker';
+import { PreviewLogSession } from './previewLogSession';
 
 interface Binding { sessionId: string; bindingId: string; url: string; tracker: TabTracker<vscode.Tab>; ownershipReported?: boolean }
 export class IntegratedBrowser implements PreviewBrowser {
@@ -11,8 +12,10 @@ export class IntegratedBrowser implements PreviewBrowser {
   private tail: Promise<void> = Promise.resolve();
   private reconcileTimer?: ReturnType<typeof setTimeout>;
   private readonly subscriptions: vscode.Disposable[];
+  private readonly logs: PreviewLogSession;
   constructor(private readonly active: (id: string) => boolean, private readonly log: (text: string) => void) {
-    this.subscriptions = [vscode.window.tabGroups.onDidChangeTabs(() => this.observe()), vscode.window.tabGroups.onDidChangeTabGroups(() => this.observe())];
+    this.logs = new PreviewLogSession(log);
+    this.subscriptions = [vscode.window.tabGroups.onDidChangeTabs(() => this.observe()), vscode.window.tabGroups.onDidChangeTabGroups(() => this.observe()), this.logs.events.subscribe(event => this.events.emit(event))];
   }
   static async checkSupport(): Promise<void> {
     const commands = await vscode.commands.getCommands(true);
@@ -60,13 +63,14 @@ export class IntegratedBrowser implements PreviewBrowser {
       }
       const old = this.binding;
       const tracker = new TabTracker<vscode.Tab>(); tracker.bind(tab, this.tabs());
-      const bindingId = old?.sessionId === id ? old.bindingId : `browser-${++this.generation}`;
+      const bindingId = old?.sessionId === id && old.tracker.current === tab ? old.bindingId : `browser-${++this.generation}`;
       this.binding = { sessionId: id, bindingId, url, tracker };
       this.events.emit({ type: 'BROWSER_OPENED', sessionId: id, bindingId });
       if (previous && this.active(id) && this.tabs().some(t => t.input instanceof vscode.TabInputText && t.input.uri.toString() === previous.document.uri.toString())) {
         const editor = await vscode.window.showTextDocument(previous.document, { viewColumn: previous.viewColumn, preserveFocus: false });
         if (selection) editor.selections = selection;
       }
+      if (this.active(id)) void this.logs.attach(id, bindingId, url);
     });
   }
   private async activeBrowserTab(): Promise<vscode.Tab | undefined> {
@@ -114,11 +118,13 @@ export class IntegratedBrowser implements PreviewBrowser {
   async release(id: string): Promise<void> {
     if (this.binding?.sessionId === id) { this.generation++; this.binding.tracker.clear(); this.binding = undefined; }
     clearTimeout(this.reconcileTimer);
+    await this.logs.release(id);
     await this.tail;
   }
   get currentTab(): vscode.Tab | undefined { return this.binding?.tracker.current; }
   dispose(): void {
     this.generation++; clearTimeout(this.reconcileTimer); this.binding?.tracker.clear(); this.binding = undefined;
+    this.logs.dispose();
     for (const subscription of this.subscriptions) subscription.dispose(); this.events.clear();
   }
 }

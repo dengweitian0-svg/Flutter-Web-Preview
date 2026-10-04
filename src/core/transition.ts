@@ -66,7 +66,24 @@ export function transition(snapshot: Snapshot, event: SessionEvent): Transition 
       if (state.kind === 'starting') { context.started = true; ready(); }
       break;
     case 'BROWSER_OPENED':
-      if (state.kind !== 'stopping') { context.bindingId = event.bindingId; context.browserOpen = true; drain(); }
+      if (state.kind !== 'stopping') {
+        if (context.bindingId !== event.bindingId) { context.logConsoleConnected = false; context.logError = undefined; }
+        context.bindingId = event.bindingId; context.browserOpen = true; drain();
+      }
+      break;
+    case 'LOG_SESSION_STARTED':
+      if (event.bindingId === context.bindingId && state.kind !== 'stopping') { context.logConsoleConnected = true; context.logError = undefined; }
+      break;
+    case 'LOG_SESSION_ENDED':
+      if (event.bindingId !== context.bindingId || state.kind === 'stopping') break;
+      context.logConsoleConnected = false;
+      context.nextSpec = undefined;
+      stop('stopped');
+      break;
+    case 'LOG_SESSION_ERROR':
+      if (event.bindingId !== context.bindingId || state.kind === 'stopping') break;
+      context.logConsoleConnected = false; context.logError = event.message;
+      effects.push({ type: 'REPORT', message: event.message });
       break;
     case 'BROWSER_CLOSED':
       if (event.bindingId !== context.bindingId) break;
@@ -117,6 +134,7 @@ export function transition(snapshot: Snapshot, event: SessionEvent): Transition 
       break;
     case 'CLEANED':
       if (state.kind === 'stopping') {
+        context.logConsoleConnected = false; context.logError = undefined;
         context.browserOpen = false; context.bindingId = undefined; context.appId = undefined; context.url = undefined; context.started = false;
         result.state = state.next === 'failed' ? { kind: 'failed', failure: state.failure ?? 'Preview failed.' } : { kind: 'stopped' };
         if (state.next === 'failed') effects.push({ type: 'REPORT', message: state.failure ?? 'Preview failed.' });
