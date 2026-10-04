@@ -15,6 +15,30 @@ async function until(predicate: () => boolean | Promise<boolean>, timeout = 1800
 interface Output { session: vscode.DebugSession; body: { output?: string; variablesReference?: number } }
 function rootSession(session: vscode.DebugSession): vscode.DebugSession { while (session.parentSession) session = session.parentSession; return session; }
 
+export async function logConsoleStopTest(): Promise<void> {
+  const extension = vscode.extensions.getExtension<PreviewApi>('wende.flutter-web-preview'); assert(extension);
+  const api = await extension.activate();
+  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath; assert(root);
+  const file = vscode.Uri.file(path.join(root, 'lib/main.dart'));
+  const config = vscode.workspace.getConfiguration('flutterWebPreview', file);
+  const initialSdk = config.inspect<string>('flutterSdkPath')?.workspaceValue;
+  try {
+    if (process.env.FLUTTER_SDK_PATH) await config.update('flutterSdkPath', process.env.FLUTTER_SDK_PATH, vscode.ConfigurationTarget.Workspace);
+    await vscode.commands.executeCommand('flutterWebPreview.run', file);
+    await until(() => api.getStatus().state === 'failed' || api.getStatus().logConsoleConnected);
+    assert.equal(api.getStatus().state, 'running', api.getStatus().error);
+    await until(() => !!vscode.debug.activeDebugSession?.parentSession && !!rootSession(vscode.debug.activeDebugSession).configuration.flutterWebPreviewLogToken, 15000);
+    await vscode.commands.executeCommand('workbench.action.debug.stop');
+    await until(() => api.getStatus().state === 'stopped', 15000); await checkPort(7357);
+    const artifacts = process.env.PREVIEW_ARTIFACTS_DIR ?? path.join(extension.extensionPath, 'artifacts'); await mkdir(artifacts, { recursive: true });
+    await writeFile(path.join(artifacts, 'log-console-toolbar-stop.json'), JSON.stringify({ status: api.getStatus(), vscode: vscode.version, extensionPath: extension.extensionPath }, null, 2));
+    console.log('LOG CONSOLE TOOLBAR STOP PASSED');
+  } finally {
+    await vscode.commands.executeCommand('flutterWebPreview.stop');
+    await config.update('flutterSdkPath', initialSdk, vscode.ConfigurationTarget.Workspace);
+  }
+}
+
 export async function logConsoleTest(): Promise<void> {
   const extension = vscode.extensions.getExtension<PreviewApi>('wende.flutter-web-preview'); assert(extension);
   const api = await extension.activate();
@@ -122,7 +146,8 @@ export async function logConsoleTest(): Promise<void> {
     checks.push('Other browser and active debug session remain isolated; Stop releases Flutter port');
 
     await command('run', file); await ready();
-    await vscode.debug.stopDebugging([...sessions.values()].filter(session => !session.parentSession && session.configuration.flutterWebPreviewLogToken).at(-1));
+    await until(() => !!vscode.debug.activeDebugSession && !!rootSession(vscode.debug.activeDebugSession).configuration.flutterWebPreviewLogToken, 5000);
+    await vscode.commands.executeCommand('workbench.action.debug.stop');
     await until(() => api.getStatus().state === 'stopped', 15000); await checkPort(7357);
     checks.push('Stopping the owned logging session stops the preview and releases the port');
     await command('run', file); await ready();
@@ -140,6 +165,6 @@ export async function logConsoleTest(): Promise<void> {
     await command('stop'); if (unrelated) await vscode.debug.stopDebugging(unrelated);
     await replace(original); await config.update('flutterSdkPath', initialSdk, vscode.ConfigurationTarget.Workspace);
     tracker.dispose(); terminations.dispose(); await new Promise<void>(resolve => server.close(() => resolve()));
-    await writeFile(path.join(artifacts, 'log-console-checks.json'), JSON.stringify({ checks, status: api.getStatus(), vscode: vscode.version, sdk: process.env.FLUTTER_SDK_PATH, output: records.map(record => ({ name: record.session.name, body: record.body })) }, null, 2));
+    await writeFile(path.join(artifacts, 'log-console-checks.json'), JSON.stringify({ checks, status: api.getStatus(), vscode: vscode.version, sdk: process.env.FLUTTER_SDK_PATH, extensionPath: extension.extensionPath, output: records.map(record => ({ name: record.session.name, body: record.body })) }, null, 2));
   }
 }
