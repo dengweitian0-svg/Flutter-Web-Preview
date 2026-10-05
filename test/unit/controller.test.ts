@@ -35,6 +35,15 @@ describe('update scheduling and cleanup', () => {
     const stopped = app.controller.stop(); app.finishStop(); await stopped;
     expect(app.controller.current.state.kind).toBe('stopped'); await app.controller.dispose();
   });
+  it('reports browser cleanup failure without exit and completes only after a successful retry', async () => {
+    const app = setup(); app.runtime.stop.mockImplementation(async () => {});
+    app.browser.release.mockRejectedValueOnce(new Error('Debugger still attached'));
+    await expect(app.controller.stop()).rejects.toThrow('cleanup did not complete');
+    expect(app.browser.reportLifecycle).toHaveBeenCalledExactlyOnceWith('preview-1', { cleaned: false, failure: 'Error: Debugger still attached' });
+    await app.controller.stop();
+    expect(app.browser.reportLifecycle).toHaveBeenLastCalledWith('preview-1', { cleaned: true, failure: undefined });
+    expect(app.controller.current.state.kind).toBe('stopped'); await app.controller.dispose();
+  });
   it('debounces saves and performs one extra compile for saves during compilation', async () => {
     vi.useFakeTimers();
     const app = setup();

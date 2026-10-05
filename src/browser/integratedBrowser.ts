@@ -71,7 +71,15 @@ export class IntegratedBrowser implements PreviewBrowser {
         const editor = await vscode.window.showTextDocument(previous.document, { viewColumn: previous.viewColumn, preserveFocus: false });
         if (selection) editor.selections = selection;
       }
-      if (this.active(id)) void this.logs.attach(id, bindingId, url);
+      if (this.active(id)) void this.logs.attach(id, bindingId, url).then(async () => {
+        // Starting a child debugger can reveal the browser after the initial focus restore.
+        const currentTab = vscode.window.tabGroups.activeTabGroup.activeTab;
+        const previousTabActive = currentTab?.input instanceof vscode.TabInputText && currentTab.input.uri.toString() === previous?.document.uri.toString();
+        if (previous && !previous.document.isClosed && this.active(id) && this.binding?.bindingId === bindingId && !vscode.window.activeTextEditor && (currentTab === tab || previousTabActive)) {
+          const editor = await vscode.window.showTextDocument(previous.document, { viewColumn: previous.viewColumn, preserveFocus: false });
+          if (selection) editor.selections = selection;
+        }
+      }).catch(error => this.log(`Cannot restore editor after log attachment: ${String(error)}\n`));
     });
   }
   private async activeBrowserTab(): Promise<vscode.Tab | undefined> {

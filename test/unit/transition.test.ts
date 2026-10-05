@@ -15,6 +15,14 @@ function ready(): Snapshot {
   return value;
 }
 describe('session transitions', () => {
+  it('an explicit console Stop cancels a queued restart while stale requests cannot stop a new preview', () => {
+    const restarting = step(ready(), { type: 'RESTART' });
+    const stopped = step(restarting, { type: 'LOG_CONSOLE_STOP_REQUEST', sessionId: 'preview-1' });
+    expect(stopped.context.nextSpec).toBeUndefined();
+    const cleaned = step(stopped, { type: 'CLEANED', sessionId: 'preview-1' });
+    expect(cleaned.effects.some(effect => effect.type === 'DISPATCH')).toBe(false);
+    expect(step(ready(), { type: 'LOG_CONSOLE_STOP_REQUEST', sessionId: 'old' }).state.kind).toBe('running');
+  });
   it('stopping the owned log session stops the preview, but stale log events do not', () => {
     expect(step(ready(), { type: 'LOG_SESSION_ENDED', sessionId: 'old', bindingId: 'tab-1' }).state.kind).toBe('running');
     expect(step(ready(), { type: 'LOG_SESSION_ENDED', sessionId: 'preview-1', bindingId: 'old' }).state.kind).toBe('running');

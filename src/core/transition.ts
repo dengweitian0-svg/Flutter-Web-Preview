@@ -81,7 +81,8 @@ export function transition(snapshot: Snapshot, event: SessionEvent): Transition 
       stop('stopped');
       break;
     case 'LOG_CONSOLE_STOP_REQUEST':
-      if (state.kind !== 'stopping') { context.nextSpec = undefined; stop('stopped'); }
+      context.nextSpec = undefined;
+      stop('stopped');
       break;
     case 'LOG_SESSION_ERROR':
       if (event.bindingId !== context.bindingId || state.kind === 'stopping') break;

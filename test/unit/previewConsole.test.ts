@@ -47,6 +47,13 @@ function setup() { const console = new PreviewConsole(vi.fn()); consoles.push(co
 function output(id: string) { return messages.get(id)!.filter(message => message.event === 'output').map(message => String((message.body as { output: string }).output)).join(''); }
 
 describe('owned persistent preview consoles', () => {
+  it('ignores termination of a child even if it carries copied parent metadata', async () => {
+    const { console, stops } = setup(); const session = (await console.ensure('preview-1'))!;
+    const child = { id: 'child', parentSession: session, configuration: { ...session.configuration, type: 'pwa-editor-browser' } } as DebugSession;
+    for (const listener of broker.ends) listener(child);
+    expect(stops).not.toHaveBeenCalled(); expect(await console.ensure('preview-1')).toBe(session);
+    console.reportLifecycle('preview-1', { cleaned: true }); expect(output(session.id)).toContain('exit:');
+  });
   it('reuses a console per preview and routes late completion only to its original session', async () => {
     const { console } = setup(); const first = (await console.ensure('preview-1'))!;
     expect(await console.ensure('preview-1')).toBe(first);

@@ -34,7 +34,7 @@ export class PreviewConsole implements PreviewConsoleHost, vscode.Disposable {
         const id: unknown = session.configuration.flutterWebPreviewConsoleSessionId;
         if (typeof id !== 'string') return;
         const entry = this.entries.get(id);
-        if (!entry || entry.token !== session.configuration.flutterWebPreviewConsoleToken) return;
+        if (!entry || entry.token !== session.configuration.flutterWebPreviewConsoleToken || entry.session?.id !== session.id || session.configuration.type !== previewDebugType) return;
         this.entries.delete(id);
         this.requestStop(entry);
       }),
