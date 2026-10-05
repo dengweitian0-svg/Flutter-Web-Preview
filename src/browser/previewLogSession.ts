@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import * as vscode from 'vscode';
 import { Signal } from '../core/signal';
 import type { BrowserEvent } from '../core/types';
+import { previewDebugType, type PreviewConsoleHost } from './previewConsole';
 
 interface Attachment {
   token: string; sessionId: string; bindingId: string; url: string;
@@ -20,11 +21,11 @@ export class PreviewLogSession {
   private readonly subscriptions: vscode.Disposable[];
   private disposed = false;
 
-  constructor(private readonly log: (text: string) => void) {
+  constructor(private readonly log: (text: string) => void, private readonly console: PreviewConsoleHost) {
     this.subscriptions = [
       vscode.debug.onDidStartDebugSession(session => {
         const token: unknown = session.configuration.flutterWebPreviewLogToken;
-        if (session.parentSession || typeof token !== 'string' || !token.startsWith(this.owner)) return;
+        if ((session.parentSession && session.parentSession.configuration.type !== previewDebugType) || typeof token !== 'string' || !token.startsWith(this.owner)) return;
         const attachment = this.attachments.get(token);
         if (!attachment || attachment.cancelled || this.disposed) {
           if (attachment) attachment.debugSession = session;
@@ -33,7 +34,7 @@ export class PreviewLogSession {
       }),
       vscode.debug.onDidTerminateDebugSession(session => {
         const token: unknown = session.configuration.flutterWebPreviewLogToken;
-        if (session.parentSession || typeof token !== 'string') return;
+        if ((session.parentSession && session.parentSession.configuration.type !== previewDebugType) || typeof token !== 'string') return;
         const attachment = this.attachments.get(token);
         if (!attachment || attachment.debugSession?.id !== session.id) return;
         attachment.terminated = true;
@@ -69,14 +70,17 @@ export class PreviewLogSession {
       if (previous?.ready) this.attachments.delete(previous.token);
       if (attachment.cancelled) return;
       if (!vscode.extensions.getExtension('ms-vscode.js-debug')) throw new Error('Enable the built-in JavaScript Debugger extension.');
+      const parent = await this.console.ensure(attachment.sessionId);
+      if (!parent || attachment.cancelled) return;
       launch = vscode.debug.startDebugging(undefined, {
         type: 'editor-browser', request: 'attach', name: 'Flutter Web Preview',
         urlFilter: `${new URL(attachment.url).origin}/*`, outputCapture: 'console',
         timeout: 30000,
-        noDebug: true, internalConsoleOptions: 'openOnSessionStart',
+        noDebug: true, internalConsoleOptions: 'neverOpen',
         flutterWebPreviewLogToken: attachment.token,
       }, {
-        noDebug: true, consoleMode: vscode.DebugConsoleMode.Separate,
+        noDebug: true, parentSession: parent, consoleMode: vscode.DebugConsoleMode.MergeWithParent,
+        lifecycleManagedByParent: false,
         suppressSaveBeforeStart: true, suppressDebugToolbar: true,
         suppressDebugStatusbar: true, suppressDebugView: true,
       });

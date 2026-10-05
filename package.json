@@ -18,6 +18,7 @@
   },
   "activationEvents": ["onLanguage:dart", "workspaceContains:**/pubspec.yaml"],
   "contributes": {
+    "debuggers": [{ "type": "flutter-web-preview", "label": "Flutter Web Preview Logs", "languages": [], "configurationAttributes": { "launch": { "properties": {}, "required": [] } } }],
     "commands": [
       { "command": "flutterWebPreview.run", "title": "Run Web Preview", "category": "Flutter Web Preview" },
       { "command": "flutterWebPreview.stop", "title": "Stop Web Preview", "category": "Flutter Web Preview" },

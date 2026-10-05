@@ -27,7 +27,7 @@ export async function logConsoleStopTest(): Promise<void> {
     await vscode.commands.executeCommand('flutterWebPreview.run', file);
     await until(() => api.getStatus().state === 'failed' || api.getStatus().logConsoleConnected);
     assert.equal(api.getStatus().state, 'running', api.getStatus().error);
-    await until(() => !!vscode.debug.activeDebugSession?.parentSession && !!rootSession(vscode.debug.activeDebugSession).configuration.flutterWebPreviewLogToken, 15000);
+    await until(() => !!vscode.debug.activeDebugSession && !!rootSession(vscode.debug.activeDebugSession).configuration.flutterWebPreviewLogToken, 15000);
     await vscode.commands.executeCommand('workbench.action.debug.stop');
     await until(() => api.getStatus().state === 'stopped', 15000); await checkPort(7357);
     const artifacts = process.env.PREVIEW_ARTIFACTS_DIR ?? path.join(extension.extensionPath, 'artifacts'); await mkdir(artifacts, { recursive: true });

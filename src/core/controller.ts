@@ -60,6 +60,10 @@ export class PreviewSessionController {
       case 'CLEAR_TIMERS': this.clearTimers(); break;
       case 'DISPATCH': this.dispatch(effect.event); break;
       case 'REPORT': this.report(effect.message); break;
+      case 'CONSOLE_RESULT':
+        try { this.browser.reportLifecycle(effect.sessionId, effect.result); }
+        catch (error) { this.log(`Cannot display preview lifecycle result: ${String(error)}`); }
+        break;
       case 'START': {
         this.startup = setTimeout(() => this.dispatch({ type: 'FATAL', sessionId: effect.sessionId, message: 'Flutter startup timed out. Check the output and run again.' }), effect.spec.startupTimeout);
         void this.runtime.start(effect.sessionId, effect.spec).catch(error => this.dispatch({ type: 'FATAL', sessionId: effect.sessionId, message: String(error) }));

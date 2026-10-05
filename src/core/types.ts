@@ -52,6 +52,7 @@ export type SessionEvent =
   | { type: 'BROWSER_REFRESHED'; sessionId: string; bindingId: string; latencyMs?: number }
   | { type: 'LOG_SESSION_STARTED' | 'LOG_SESSION_ENDED'; sessionId: string; bindingId: string }
   | { type: 'LOG_SESSION_ERROR'; sessionId: string; bindingId: string; message: string }
+  | { type: 'LOG_CONSOLE_STOP_REQUEST'; sessionId: string }
   | { type: 'COMPILED'; sessionId: string; operationId: number; code: number; message?: string; completedAt?: number }
   | { type: 'FATAL'; sessionId: string; message: string }
   | { type: 'CLEANED'; sessionId: string }
@@ -64,14 +65,16 @@ export type Effect =
   | { type: 'OPEN'; sessionId: string; url: string }
   | { type: 'REFRESH'; sessionId: string; operationId?: number; completedAt?: number }
   | { type: 'DISPATCH'; event: SessionEvent }
+  | { type: 'CONSOLE_RESULT'; sessionId: string; result: ConsoleResult }
   | { type: 'REPORT'; message: string };
+export interface ConsoleResult { cleaned: boolean; failure?: string }
 export interface Transition extends Snapshot { effects: Effect[] }
 export interface Disposable { dispose(): void }
 export interface EventSource<T> { subscribe(listener: (event: T) => void): Disposable }
 export interface CompileResult { code: number; message?: string; completedAt?: number }
 export type RuntimeEvent =
   | Extract<SessionEvent, { type: 'APP_ID' | 'URL' | 'STARTED' | 'FATAL' }>;
-export type BrowserEvent = Extract<SessionEvent, { type: 'BROWSER_OPENED' | 'BROWSER_CLOSED' | 'BROWSER_ERROR' | 'BROWSER_REFRESHED' | 'LOG_SESSION_STARTED' | 'LOG_SESSION_ENDED' | 'LOG_SESSION_ERROR' }>;
+export type BrowserEvent = Extract<SessionEvent, { type: 'BROWSER_OPENED' | 'BROWSER_CLOSED' | 'BROWSER_ERROR' | 'BROWSER_REFRESHED' | 'LOG_SESSION_STARTED' | 'LOG_SESSION_ENDED' | 'LOG_SESSION_ERROR' | 'LOG_CONSOLE_STOP_REQUEST' }>;
 export interface FlutterRuntime {
   readonly events: EventSource<RuntimeEvent>;
   start(sessionId: string, spec: LaunchSpec): Promise<void>;
@@ -83,4 +86,5 @@ export interface PreviewBrowser {
   open(sessionId: string, url: string): Promise<void>;
   refresh(sessionId: string, completedAt?: number): Promise<void>;
   release(sessionId: string): Promise<void>;
+  reportLifecycle(sessionId: string, result: ConsoleResult): void;
 }

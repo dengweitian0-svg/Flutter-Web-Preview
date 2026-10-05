@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DebugSession } from 'vscode';
+import { Signal } from '../../src/core/signal';
+import type { BrowserEvent } from '../../src/core/types';
 import { PreviewLogSession } from '../../src/browser/previewLogSession';
 
 const debug = vi.hoisted(() => ({
@@ -13,7 +15,7 @@ vi.mock('vscode', () => ({
     onDidStartDebugSession: (listener: (session: DebugSession) => void) => { debug.starts.add(listener); return { dispose: () => debug.starts.delete(listener) }; },
     onDidTerminateDebugSession: (listener: (session: DebugSession) => void) => { debug.ends.add(listener); return { dispose: () => debug.ends.delete(listener) }; },
   },
-  extensions: { getExtension: debug.getExtension }, DebugConsoleMode: { Separate: 0 },
+  extensions: { getExtension: debug.getExtension }, DebugConsoleMode: { Separate: 0, MergeWithParent: 1 },
 }));
 let sequence = 0;
 const started: DebugSession[] = [];
@@ -24,7 +26,7 @@ function start(configuration: DebugSession['configuration'], parentSession?: Deb
 function end(session: DebugSession) { for (const listener of debug.ends) listener(session); }
 const adapters: PreviewLogSession[] = [];
 function setup() {
-  const adapter = new PreviewLogSession(vi.fn()); adapters.push(adapter);
+  const adapter = new PreviewLogSession(vi.fn(), { events: new Signal<BrowserEvent>(), ensure: async () => ({ id: 'console', configuration: { type: 'flutter-web-preview' } }) as DebugSession, reportLifecycle: vi.fn() }); adapters.push(adapter);
   const events = vi.fn(); adapter.events.subscribe(events); return { adapter, events };
 }
 beforeEach(() => {
@@ -45,7 +47,7 @@ describe('owned browser log sessions', () => {
     await adapter.attach('preview-1', 'tab-1', 'http://127.0.0.1:7357/');
     expect(debug.startDebugging).toHaveBeenCalledTimes(1);
     expect(debug.startDebugging).toHaveBeenCalledWith(undefined, expect.objectContaining({
-      type: 'editor-browser', request: 'attach', urlFilter: 'http://127.0.0.1:7357/*', noDebug: true, outputCapture: 'console', internalConsoleOptions: 'openOnSessionStart',
+      type: 'editor-browser', request: 'attach', urlFilter: 'http://127.0.0.1:7357/*', noDebug: true, outputCapture: 'console', internalConsoleOptions: 'neverOpen',
     }), expect.objectContaining({ suppressSaveBeforeStart: true, suppressDebugToolbar: true, suppressDebugStatusbar: true, suppressDebugView: true }));
     expect(events).toHaveBeenCalledWith({ type: 'LOG_SESSION_STARTED', sessionId: 'preview-1', bindingId: 'tab-1' });
   });
@@ -68,6 +70,7 @@ describe('owned browser log sessions', () => {
     let finish!: () => void;
     debug.startDebugging.mockImplementation((_folder, configuration) => new Promise<boolean>(resolve => { finish = () => { start(configuration); resolve(true); }; }));
     const { adapter, events } = setup(); const pending = adapter.attach('preview-1', 'tab-1', 'http://127.0.0.1:7357/');
+    await Promise.resolve();
     await adapter.release('preview-1'); finish(); await pending;
     expect(debug.stopDebugging).toHaveBeenCalledExactlyOnceWith(started[0]); expect(events).not.toHaveBeenCalled();
   });

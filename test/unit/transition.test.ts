@@ -88,7 +88,9 @@ describe('session transitions', () => {
     const closed = step(restarting, { type: 'BROWSER_CLOSED', sessionId: 'preview-1', bindingId: 'tab-1' });
     expect(closed.context.nextSpec).toBeUndefined();
     expect(closed.effects.some(e => e.type === 'STOP')).toBe(false);
-    expect(step(closed, { type: 'CLEANED', sessionId: 'preview-1' }).effects).toEqual([]);
+    const cleaned = step(closed, { type: 'CLEANED', sessionId: 'preview-1' });
+    expect(cleaned.effects.some(effect => effect.type === 'DISPATCH')).toBe(false);
+    expect(cleaned.effects.filter(effect => effect.type === 'CONSOLE_RESULT')).toHaveLength(1);
   });
   it('failure is terminal only after cleanup, and cleanup failure never permits another process', () => {
     const failed = step(ready(), { type: 'FATAL', sessionId: 'preview-1', message: 'Timeout' });

@@ -6,6 +6,8 @@ import { createServer } from 'node:http';
 import { IntegratedBrowser } from '../../src/browser/integratedBrowser';
 import { FlutterProcessRuntime, checkPort } from '../../src/flutter/flutterRuntime';
 import { PreviewSessionController } from '../../src/core/controller';
+import { Signal } from '../../src/core/signal';
+import type { BrowserEvent } from '../../src/core/types';
 import { sessionId } from '../../src/core/types';
 import { sdkRoot } from '../../src/project/resolveLaunch';
 import { endToEnd } from './endToEnd';
@@ -67,7 +69,7 @@ async function runtimeLifecycle(): Promise<void> {
   const file = path.join(root, 'lib', 'main.dart'); const original = await readFile(file, 'utf8');
   const log: string[] = []; const report: string[] = [];
   const runtime = new FlutterProcessRuntime(text => { log.push(text); console.log(text); });
-  const browser: IntegratedBrowser = new IntegratedBrowser(id => controller && sessionId(controller.current.state) === id && !['stopping', 'stopped', 'failed'].includes(controller.current.state.kind), text => { log.push(text); console.log(text); });
+  const browser: IntegratedBrowser = new IntegratedBrowser(id => controller && sessionId(controller.current.state) === id && !['stopping', 'stopped', 'failed'].includes(controller.current.state.kind), text => { log.push(text); console.log(text); }, { events: new Signal<BrowserEvent>(), ensure: async () => undefined, reportLifecycle: () => {} });
   const controller: PreviewSessionController = new PreviewSessionController(runtime, browser, message => { report.push(message); console.log(message); }, console.log);
   try {
     await vscode.window.showTextDocument(vscode.Uri.file(file));
@@ -103,7 +105,7 @@ async function browserLifecycle(): Promise<void> {
   await new Promise<void>(resolve => server.listen(7357, '127.0.0.1', resolve));
   let closed = 0; let active = true;
   let lost = false;
-  const browser = new IntegratedBrowser(() => active, console.log);
+  const browser = new IntegratedBrowser(() => active, console.log, { events: new Signal<BrowserEvent>(), ensure: async () => undefined, reportLifecycle: () => {} });
   browser.events.subscribe(event => { if (event.type === 'BROWSER_CLOSED') { closed++; active = false; } if (event.type === 'BROWSER_ERROR' && event.bindingLost) lost = true; });
   try {
     await IntegratedBrowser.checkSupport();

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import path from 'node:path';
 import { IntegratedBrowser } from './browser/integratedBrowser';
+import { PreviewConsole } from './browser/previewConsole';
 import { PreviewSessionController } from './core/controller';
 import { sessionId, type SessionState } from './core/types';
 import { FlutterProcessRuntime } from './flutter/flutterRuntime';
@@ -24,7 +25,9 @@ export function activate(context: vscode.ExtensionContext): PreviewApi {
     }
   };
   const runtime = new FlutterProcessRuntime(log);
-  const preview: IntegratedBrowser = new IntegratedBrowser(id => !!controller && sessionId(controller.current.state) === id && ['starting', 'running', 'updating'].includes(controller.current.state.kind), log);
+  const console = new PreviewConsole(log);
+  context.subscriptions.push(console);
+  const preview: IntegratedBrowser = new IntegratedBrowser(id => !!controller && sessionId(controller.current.state) === id && ['starting', 'running', 'updating'].includes(controller.current.state.kind), log, console);
   browser = preview;
   const session = new PreviewSessionController(runtime, preview, report, log, snapshot => {
     const resource = snapshot.context.currentSpec ? vscode.Uri.file(snapshot.context.currentSpec.projectRoot) : undefined;
@@ -32,6 +35,7 @@ export function activate(context: vscode.ExtensionContext): PreviewApi {
   });
   controller = session;
   context.subscriptions.push(preview.events.subscribe(event => {
+    if (event.type === 'LOG_CONSOLE_STOP_REQUEST' && event.sessionId === sessionId(session.current.state)) intent++;
     if ((event.type === 'BROWSER_CLOSED' || event.type === 'LOG_SESSION_ENDED') && event.sessionId === sessionId(session.current.state) && event.bindingId === session.current.context.bindingId) intent++;
     if (event.type === 'LOG_SESSION_ERROR' && event.sessionId === sessionId(session.current.state) && event.bindingId === session.current.context.bindingId) {
       void vscode.window.showWarningMessage(event.message, 'Open Preview Browser').then(choice => {

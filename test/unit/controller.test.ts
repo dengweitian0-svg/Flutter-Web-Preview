@@ -8,7 +8,7 @@ function setup() {
   let finishCompile: (result: CompileResult) => void = () => {};
   let finishStop: () => void = () => {};
   const runtime = { events: new Signal<RuntimeEvent>(), start: vi.fn(async () => {}), recompile: vi.fn(() => new Promise<CompileResult>(resolve => { finishCompile = resolve; })), stop: vi.fn(() => new Promise<void>(resolve => { finishStop = resolve; })) } satisfies FlutterRuntime;
-  const browser = { events: new Signal<BrowserEvent>(), open: vi.fn(async () => { browser.events.emit({ type: 'BROWSER_OPENED', sessionId: 'preview-1', bindingId: 'tab' }); }), refresh: vi.fn(async () => {}), release: vi.fn(async () => {}) } satisfies PreviewBrowser;
+  const browser = { events: new Signal<BrowserEvent>(), open: vi.fn(async () => { browser.events.emit({ type: 'BROWSER_OPENED', sessionId: 'preview-1', bindingId: 'tab' }); }), refresh: vi.fn(async () => {}), release: vi.fn(async () => {}), reportLifecycle: vi.fn() } satisfies PreviewBrowser;
   const report = vi.fn();
   const controller = new PreviewSessionController(runtime, browser, report);
   controller.dispatch({ type: 'RUN', spec });
@@ -19,6 +19,22 @@ function setup() {
 }
 afterEach(() => vi.useRealTimers());
 describe('update scheduling and cleanup', () => {
+  it('reports exit only after both process and browser cleanup have completed', async () => {
+    const app = setup(); let finishBrowser!: () => void;
+    app.browser.release.mockImplementation(() => new Promise<void>(resolve => { finishBrowser = resolve; }));
+    const stopped = app.controller.stop();
+    expect(app.browser.reportLifecycle).not.toHaveBeenCalled();
+    app.finishStop(); await Promise.resolve(); await Promise.resolve();
+    expect(app.browser.release).toHaveBeenCalled(); expect(app.browser.reportLifecycle).not.toHaveBeenCalled();
+    finishBrowser(); await stopped;
+    expect(app.browser.reportLifecycle).toHaveBeenCalledExactlyOnceWith('preview-1', { cleaned: true, failure: undefined });
+    await app.controller.stop(); expect(app.browser.reportLifecycle).toHaveBeenCalledTimes(1);
+  });
+  it('does not let a console output failure undo confirmed process cleanup', async () => {
+    const app = setup(); app.browser.reportLifecycle.mockImplementation(() => { throw new Error('Console disconnected'); });
+    const stopped = app.controller.stop(); app.finishStop(); await stopped;
+    expect(app.controller.current.state.kind).toBe('stopped'); await app.controller.dispose();
+  });
   it('debounces saves and performs one extra compile for saves during compilation', async () => {
     vi.useFakeTimers();
     const app = setup();
@@ -48,7 +64,7 @@ describe('update scheduling and cleanup', () => {
   it('startup timeout initiates cleanup instead of claiming a successful stop', async () => {
     vi.useFakeTimers();
     const runtime = { events: new Signal<RuntimeEvent>(), start: vi.fn(async () => {}), recompile: vi.fn(async () => ({ code: 0 })), stop: vi.fn(async () => {}) };
-    const browser = { events: new Signal<BrowserEvent>(), open: vi.fn(async () => {}), refresh: vi.fn(async () => {}), release: vi.fn(async () => {}) };
+    const browser = { events: new Signal<BrowserEvent>(), open: vi.fn(async () => {}), refresh: vi.fn(async () => {}), release: vi.fn(async () => {}), reportLifecycle: vi.fn() };
     const controller = new PreviewSessionController(runtime, browser, vi.fn());
     controller.dispatch({ type: 'RUN', spec }); await vi.advanceTimersByTimeAsync(10000);
     expect(runtime.stop).toHaveBeenCalledTimes(1); expect(controller.current.state.kind).toBe('failed');
@@ -56,7 +72,7 @@ describe('update scheduling and cleanup', () => {
   });
   it('invalid runtime configuration returns to running without losing the update queue', async () => {
     const runtime = { events: new Signal<RuntimeEvent>(), start: vi.fn(async () => {}), recompile: vi.fn(async () => ({ code: 0 })), stop: vi.fn(async () => {}) };
-    const browser = { events: new Signal<BrowserEvent>(), open: vi.fn(async () => {}), refresh: vi.fn(async () => {}), release: vi.fn(async () => {}) };
+    const browser = { events: new Signal<BrowserEvent>(), open: vi.fn(async () => {}), refresh: vi.fn(async () => {}), release: vi.fn(async () => {}), reportLifecycle: vi.fn() };
     const controller = new PreviewSessionController(runtime, browser, vi.fn(), vi.fn(), () => { throw new Error('Invalid reloadTimeout'); });
     controller.dispatch({ type: 'RUN', spec });
     runtime.events.emit({ type: 'APP_ID', sessionId: 'preview-1', appId: 'app' });
@@ -69,15 +85,17 @@ describe('update scheduling and cleanup', () => {
   });
   it('does not resolve Stop or dispose successfully when cleanup failed', async () => {
     const runtime = { events: new Signal<RuntimeEvent>(), start: vi.fn(async () => {}), recompile: vi.fn(async () => ({ code: 0 })), stop: vi.fn(async (): Promise<void> => { throw new Error('Access denied'); }) };
-    const browser = { events: new Signal<BrowserEvent>(), open: vi.fn(async () => {}), refresh: vi.fn(async () => {}), release: vi.fn(async () => {}) };
+    const browser = { events: new Signal<BrowserEvent>(), open: vi.fn(async () => {}), refresh: vi.fn(async () => {}), release: vi.fn(async () => {}), reportLifecycle: vi.fn() };
     const controller = new PreviewSessionController(runtime, browser, vi.fn());
     controller.dispatch({ type: 'RUN', spec });
     await expect(controller.stop()).rejects.toThrow('cleanup did not complete');
     expect(controller.current.state.kind).toBe('stopping');
     expect(browser.release).not.toHaveBeenCalled();
+    expect(browser.reportLifecycle).toHaveBeenCalledWith('preview-1', { cleaned: false, failure: 'Error: Access denied' });
     runtime.stop.mockImplementation(async () => {});
     await controller.dispose();
     expect(controller.current.state.kind).toBe('stopped');
+    expect(browser.reportLifecycle).toHaveBeenLastCalledWith('preview-1', { cleaned: true, failure: undefined });
   });
   it('does not accept another launch while deactivation cleanup is pending', async () => {
     const app = setup();

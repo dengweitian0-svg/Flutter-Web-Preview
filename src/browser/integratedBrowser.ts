@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import { Signal } from '../core/signal';
-import type { BrowserEvent, PreviewBrowser } from '../core/types';
+import type { BrowserEvent, ConsoleResult, PreviewBrowser } from '../core/types';
 import { TabTracker } from './tabTracker';
 import { PreviewLogSession } from './previewLogSession';
+import type { PreviewConsoleHost } from './previewConsole';
 
 interface Binding { sessionId: string; bindingId: string; url: string; tracker: TabTracker<vscode.Tab>; ownershipReported?: boolean }
 export class IntegratedBrowser implements PreviewBrowser {
@@ -13,9 +14,9 @@ export class IntegratedBrowser implements PreviewBrowser {
   private reconcileTimer?: ReturnType<typeof setTimeout>;
   private readonly subscriptions: vscode.Disposable[];
   private readonly logs: PreviewLogSession;
-  constructor(private readonly active: (id: string) => boolean, private readonly log: (text: string) => void) {
-    this.logs = new PreviewLogSession(log);
-    this.subscriptions = [vscode.window.tabGroups.onDidChangeTabs(() => this.observe()), vscode.window.tabGroups.onDidChangeTabGroups(() => this.observe()), this.logs.events.subscribe(event => this.events.emit(event))];
+  constructor(private readonly active: (id: string) => boolean, private readonly log: (text: string) => void, private readonly console: PreviewConsoleHost) {
+    this.logs = new PreviewLogSession(log, console);
+    this.subscriptions = [vscode.window.tabGroups.onDidChangeTabs(() => this.observe()), vscode.window.tabGroups.onDidChangeTabGroups(() => this.observe()), this.logs.events.subscribe(event => this.events.emit(event)), console.events.subscribe(event => this.events.emit(event))];
   }
   static async checkSupport(): Promise<void> {
     const commands = await vscode.commands.getCommands(true);
@@ -122,6 +123,7 @@ export class IntegratedBrowser implements PreviewBrowser {
     await this.tail;
   }
   get currentTab(): vscode.Tab | undefined { return this.binding?.tracker.current; }
+  reportLifecycle(id: string, result: ConsoleResult): void { this.console.reportLifecycle(id, result); }
   dispose(): void {
     this.generation++; clearTimeout(this.reconcileTimer); this.binding?.tracker.clear(); this.binding = undefined;
     this.logs.dispose();

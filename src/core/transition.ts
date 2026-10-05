@@ -80,6 +80,9 @@ export function transition(snapshot: Snapshot, event: SessionEvent): Transition 
       context.nextSpec = undefined;
       stop('stopped');
       break;
+    case 'LOG_CONSOLE_STOP_REQUEST':
+      if (state.kind !== 'stopping') { context.nextSpec = undefined; stop('stopped'); }
+      break;
     case 'LOG_SESSION_ERROR':
       if (event.bindingId !== context.bindingId || state.kind === 'stopping') break;
       context.logConsoleConnected = false; context.logError = event.message;
@@ -134,6 +137,7 @@ export function transition(snapshot: Snapshot, event: SessionEvent): Transition 
       break;
     case 'CLEANED':
       if (state.kind === 'stopping') {
+        effects.push({ type: 'CONSOLE_RESULT', sessionId: state.sessionId, result: { cleaned: true, failure: state.failure } });
         context.logConsoleConnected = false; context.logError = undefined;
         context.browserOpen = false; context.bindingId = undefined; context.appId = undefined; context.url = undefined; context.started = false;
         result.state = state.next === 'failed' ? { kind: 'failed', failure: state.failure ?? 'Preview failed.' } : { kind: 'stopped' };
@@ -142,7 +146,10 @@ export function transition(snapshot: Snapshot, event: SessionEvent): Transition 
       }
       break;
     case 'CLEANUP_FAILED':
-      if (state.kind === 'stopping') effects.push({ type: 'REPORT', message: `Cannot confirm Flutter stopped: ${event.message}. Retry Stop.` });
+      if (state.kind === 'stopping') {
+        effects.push({ type: 'CONSOLE_RESULT', sessionId: state.sessionId, result: { cleaned: false, failure: event.message } });
+        effects.push({ type: 'REPORT', message: `Cannot confirm Flutter stopped: ${event.message}. Retry Stop.` });
+      }
       break;
   }
   return result;
