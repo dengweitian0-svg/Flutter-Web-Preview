@@ -19,6 +19,13 @@ function setup(launch = true) {
   return { adapter, stop, messages, request, outputs };
 }
 describe('preview lifecycle console protocol', () => {
+  it('retains cleanup failure during console startup without reporting a successful exit', () => {
+    const app = setup(false); app.adapter.report({ cleaned: false, failure: 'Early failure' });
+    expect(app.outputs()).toEqual([]); app.request('launch');
+    expect(app.outputs().at(-1)).toContain('stop failed: Early failure');
+    expect(app.outputs().some(text => text.includes('exit:'))).toBe(false);
+    app.adapter.report({ cleaned: true }); expect(app.outputs().at(-1)).toContain('exit:');
+  });
   it('publishes exactly one confirmed exit before terminating its own console', () => {
     const app = setup(); app.adapter.report({ cleaned: true }); app.adapter.report({ cleaned: true });
     expect(app.outputs().filter(text => text.includes('exit:'))).toEqual(['[Flutter Web Preview] exit: preview-1 ended; Flutter stopped.\n']);

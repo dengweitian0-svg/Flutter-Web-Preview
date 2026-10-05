@@ -8,6 +8,7 @@ export class LifecycleDebugAdapter implements vscode.DebugAdapter {
   private sequence = 0;
   private launched = false;
   private completed?: ConsoleResult;
+  private pendingFailure?: string;
   private terminated = false;
   private stopRequested = false;
   private readonly pendingStops: Request[] = [];
@@ -27,6 +28,7 @@ export class LifecycleDebugAdapter implements vscode.DebugAdapter {
       case 'launch':
         this.launched = true; this.response(request);
         this.output(`[Flutter Web Preview] start: ${this.sessionId}`);
+        if (this.pendingFailure) { this.output(this.pendingFailure, 'stderr'); this.pendingFailure = undefined; }
         this.publishCompletion(); break;
       case 'configurationDone': this.response(request); break;
       case 'threads': this.response(request, { threads: [{ id: 1, name: 'Preview lifecycle' }] }); break;
@@ -45,7 +47,8 @@ export class LifecycleDebugAdapter implements vscode.DebugAdapter {
   report(result: ConsoleResult): void {
     if (this.completed || this.terminated) return;
     if (!result.cleaned) {
-      this.output(`[Flutter Web Preview] stop failed: ${result.failure ?? 'Cleanup not confirmed'}. Retry Stop Web Preview.`, 'stderr');
+      const message = `[Flutter Web Preview] stop failed: ${result.failure ?? 'Cleanup not confirmed'}. Retry Stop Web Preview.`;
+      if (this.launched) this.output(message, 'stderr'); else this.pendingFailure = message;
       return;
     }
     this.completed = result;
