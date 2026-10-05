@@ -71,6 +71,9 @@ export class PreviewSessionController {
       }
       case 'STOP': this.stopTask = this.cleanup(effect.sessionId); break;
       case 'COMPILE':
+        // A manual update or a drained save already includes all saved changes.
+        // Its old debounce must not enqueue another compile a moment later.
+        clearTimeout(this.debounce); this.debounce = undefined;
         try {
           const timeout = this.reloadTimeout(this.snapshot);
           void this.runtime.recompile(effect.session.sessionId, effect.reason, timeout).then(result => this.dispatch({ type: 'COMPILED', sessionId: effect.session.sessionId, operationId: effect.operationId, ...result }), error => this.dispatch({ type: 'FATAL', sessionId: effect.session.sessionId, message: String(error) }));

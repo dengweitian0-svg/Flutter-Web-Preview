@@ -75,6 +75,9 @@ export class PreviewLogSession {
       launch = vscode.debug.startDebugging(undefined, {
         type: 'editor-browser', request: 'attach', name: 'Flutter Web Preview',
         urlFilter: `${new URL(attachment.url).origin}/*`, outputCapture: 'console',
+        // Capture console output without parsing Flutter's large source maps
+        // or pausing script execution to resolve breakpoints that we never set.
+        sourceMaps: false, pauseForSourceMap: false, showAsyncStacks: false,
         timeout: 30000,
         noDebug: true, internalConsoleOptions: 'neverOpen',
         flutterWebPreviewLogToken: attachment.token,

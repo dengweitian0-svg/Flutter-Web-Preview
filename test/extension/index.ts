@@ -13,9 +13,11 @@ import { sdkRoot } from '../../src/project/resolveLaunch';
 import { endToEnd } from './endToEnd';
 import { shutdownTest } from './shutdown';
 import { logConsoleTest, logConsoleStopTest } from './logConsole';
+import { performanceTest } from './performance';
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 export async function run(): Promise<void> {
+  if (process.env.PREVIEW_TEST_MODE === 'performance') { await performanceTest(); return; }
   if (process.env.PREVIEW_TEST_MODE === 'capabilities') {
     const root = vscode.extensions.getExtension('wende.flutter-web-preview')?.extensionPath; assert(root);
     const tools = vscode.lm.tools.map(tool => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema }));

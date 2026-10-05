@@ -48,6 +48,7 @@ describe('owned browser log sessions', () => {
     expect(debug.startDebugging).toHaveBeenCalledTimes(1);
     expect(debug.startDebugging).toHaveBeenCalledWith(undefined, expect.objectContaining({
       type: 'editor-browser', request: 'attach', urlFilter: 'http://127.0.0.1:7357/*', noDebug: true, outputCapture: 'console', internalConsoleOptions: 'neverOpen',
+      sourceMaps: false, pauseForSourceMap: false, showAsyncStacks: false,
     }), expect.objectContaining({ suppressSaveBeforeStart: true, suppressDebugToolbar: true, suppressDebugStatusbar: true, suppressDebugView: true }));
     expect(events).toHaveBeenCalledWith({ type: 'LOG_SESSION_STARTED', sessionId: 'preview-1', bindingId: 'tab-1' });
   });

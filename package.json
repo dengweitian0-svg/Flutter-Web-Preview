@@ -2,7 +2,7 @@
   "name": "flutter-web-preview",
   "displayName": "Flutter Web Preview",
   "description": "Preview Flutter Web inside VS Code, update on Dart save, and stop when the preview closes.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "wende",
   "license": "MIT",
   "repository": { "type": "git", "url": "https://github.com/dengweitian0-svg/Flutter-Web-Preview.git" },
@@ -51,7 +51,7 @@
     "test": "node scripts/prepare-artifacts.mjs && vitest run",
     "test:extension": "npm run build && node scripts/test-extension.mjs",
     "vscode:prepublish": "npm run check && npm run build",
-    "package": "node scripts/prepare-artifacts.mjs && vsce package --no-dependencies --out artifacts/flutter-web-preview-0.1.1.vsix"
+    "package": "node scripts/prepare-artifacts.mjs && vsce package --no-dependencies --out artifacts/flutter-web-preview-0.1.2.vsix"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

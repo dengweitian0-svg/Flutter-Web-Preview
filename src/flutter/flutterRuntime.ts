@@ -9,6 +9,7 @@ import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 
 interface ProcessSession {
   id: string; cancelled: boolean; appId?: string; process?: ChildProcessWithoutNullStreams;
+  startedAt: number;
   client?: MachineClient; launch?: Promise<void>; stopping?: Promise<void>;
   exited: Promise<void>; resolveExit(): void; closed: boolean;
 }
@@ -27,7 +28,7 @@ export class FlutterProcessRuntime implements FlutterRuntime {
     if (this.session) throw new Error('The previous Flutter process has not been cleaned up.');
     let resolveExit = () => {};
     const exited = new Promise<void>(resolve => { resolveExit = resolve; });
-    const session: ProcessSession = { id, cancelled: false, closed: false, exited, resolveExit };
+    const session: ProcessSession = { id, cancelled: false, closed: false, exited, resolveExit, startedAt: Date.now() };
     this.session = session;
     session.launch = this.launch(session, spec);
     return session.launch;
@@ -37,7 +38,11 @@ export class FlutterProcessRuntime implements FlutterRuntime {
       await access(path.join(spec.sdkPath, 'bin', 'flutter.bat'));
       await checkPort(spec.port);
       if (session.cancelled) return;
-      const args = ['--suppress-analytics', 'run', '--machine', '-d', 'web-server', '--web-hostname', '127.0.0.1', '--web-port', String(spec.port), '--target', spec.entrypoint];
+      // web-server cannot apply stateful hot reload. The restart-oriented AMD
+      // compiler avoids the library-bundle overhead on full page reloads.
+      // Serve the renderer locally and omit Dart debugger evaluation metadata;
+      // application console logging uses the browser debugger independently.
+      const args = ['--suppress-analytics', 'run', '--machine', '-d', 'web-server', '--no-web-resources-cdn', '--no-web-experimental-hot-reload', '--no-web-enable-expression-evaluation', '--web-hostname', '127.0.0.1', '--web-port', String(spec.port), '--target', spec.entrypoint];
       this.log(`Starting Flutter in ${spec.projectRoot}\nflutter ${args.join(' ')}\n`);
       const child = spawnFlutter(spec.sdkPath, args, spec.projectRoot);
       session.process = child;
@@ -76,7 +81,9 @@ export class FlutterProcessRuntime implements FlutterRuntime {
             this.events.emit({ type: 'URL', sessionId: session.id, url: url.href });
             break;
           }
-          case 'app.started': this.events.emit({ type: 'STARTED', sessionId: session.id }); break;
+          case 'app.started':
+            this.log(`Flutter server ready (${Date.now() - session.startedAt} ms since start; browser rendering continues separately).\n`);
+            this.events.emit({ type: 'STARTED', sessionId: session.id }); break;
           case 'app.log': if (typeof params.log === 'string') this.log(`${params.log}\n`); break;
           case 'daemon.logMessage': if (typeof params.message === 'string') this.log(`${params.message}\n`); break;
           case 'app.progress': if (typeof params.message === 'string') this.log(`${params.message}\n`); break;
