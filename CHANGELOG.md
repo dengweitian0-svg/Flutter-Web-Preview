@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.1.1
+
+- Keep an owned lifecycle console alive after browser closure, emit exactly one confirmed exit marker, and merge browser logs into it.
+- Report cleanup failures without claiming success; preserve session isolation across Stop, Restart, and late events.
 
 - Show Flutter Web application console logs (`print`, `debugPrint`, and `dart:developer.log`) in an automatically attached Debug Console session.
 - Keep log capture across preview refreshes, and stop the preview when its owned logging session ends.

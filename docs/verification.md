@@ -89,3 +89,15 @@
 - 已安装 VSIX 的原有 E2E 回归通过：CodeLens、渲染、500 ms 内请求保存刷新、编译失败恢复、Auto Save、实时配置、移动后显式重绑定、关闭及三个 Run/Stop/Restart/关闭循环、Restart 重读端口。记录：`artifacts/e2e-debug-console-vsix.log`、`artifacts/e2e-checks.json`。本轮本地循环数为 3，CI 保留 20 轮矩阵并新增日志验收步骤；尚未运行云端 CI。
 - 测试每次使用独立 VS Code 配置目录，避免复用旧布局；Flutter 3.35 的语义指针初始化需要正常按下/松开间隔，真实鼠标测试保留该间隔并等待导航完成。
 - 原生调试器在复用/停止过程中可能输出 `Invalid debug adapter`、截图失败等内部诊断；这些记录未被隐藏，验收以实际日志、会话结束、渲染和端口释放为准。插件对父会话请求隐藏工具栏，但内置调试器的子会话仍可能显示原生工具栏；不修改用户全局调试设置。本功能不提供完整 Dart 调试。
+
+## 确认清理后的退出标记：0.1.1（2026-10-05）
+
+- 增加 `flutter-web-preview` inline DAP 父会话，生命周期属于预览而非浏览器。原生 `editor-browser` 子会话把应用输出合并到父会话，保留对象展开；自定义日志类型不声明 Dart 语言支持，不接管 Dart F5 调试。
+- 控制器在进程和浏览器清理成功、收到 `CLEANED` 后输出一次 `[Flutter Web Preview] exit: preview-… ended; Flutter stopped.`，随后结束父会话。异常原因沿用已有失败信息，不伪造退出码。清理失败保留父会话并显示停止失败；启动期间的结果及失败提示可延后显示。输出异常不阻断清理。
+- 76 个单元测试通过，新增覆盖父控制台隔离、迟到/重复完成、退出提示先于会话终止、清理失败与重试、并发/启动时序、输出失败、浏览器清理失败、显式控制台 Stop 取消排队的 Restart，以及复制父标识的子会话结束不影响父会话。
+- Flutter 3.35.1、3.47.6 真实验收通过：三类交互/异步日志与元数据展开；唯一预览关闭后的退出标记默认可见；Restart/Stop/工具栏停止各只有一个所属退出标记；保存、刷新、重绑定无退出标记；活动其他控制台不接收提示、其调试连接保持有效。
+- SDK 记录：`artifacts/exit-marker-3.35.1.log`、`artifacts/exit-marker-3.35.1-checks.json`、`artifacts/exit-marker-3.47.6.log`、`artifacts/exit-marker-3.47.6-checks.json`。
+- 0.1.1 VSIX 安装到隔离扩展目录后，同样通过上述完整验收；安装的入口 bundle 与开发构建 SHA-256 一致。记录：`artifacts/exit-marker-vsix-0.1.1.log`、`artifacts/exit-marker-vsix-0.1.1-checks.json`、`artifacts/exit-marker-vsix-0.1.1.png`。
+- 0.1.1 安装版的原有 E2E 回归及三个 Run/Stop/Restart/关闭循环通过，包含保存更新、Auto Save、错误恢复、显式重绑定、实时配置与端口切换；日志已连接后的 VS Code 窗口关闭清理通过。记录：`artifacts/exit-marker-vsix-e2e.log`、`artifacts/e2e-checks.json`、`artifacts/exit-marker-vsix-shutdown.log`、`artifacts/shutdown-marker.json`。
+- 调试器启动可能重新显示浏览器，插件在连接完成后有条件恢复原编辑器焦点；真实测试已验证恢复。测试主动选择另一个控制台来验证隔离，随后主动选择对应旧预览控制台来检查已结束会话的提示。
+- 安装包升级为 `flutter-web-preview-0.1.1.vsix`；安装版测试目录从 manifest 版本推导。云端 CI 未在本轮执行；原生调试器已有内部诊断仍保留在运行记录中。

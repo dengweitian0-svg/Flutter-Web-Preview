@@ -30,7 +30,7 @@ flutter pub get
 
 ### 安装扩展
 
-当前使用 VSIX 安装。已有 `flutter-web-preview-0.1.0.vsix` 时，在 VS Code 命令面板执行 **Extensions: Install from VSIX...** 并选择该文件。
+当前使用 VSIX 安装。已有 `flutter-web-preview-0.1.1.vsix` 时，在 VS Code 命令面板执行 **Extensions: Install from VSIX...** 并选择该文件。
 
 也可以从源码生成安装包。下载或克隆本仓库后，在仓库根目录执行（建议使用 Node.js 24，与 CI 配置一致）：
 
@@ -39,7 +39,7 @@ npm ci
 npm run package
 ```
 
-安装包输出到 `artifacts/flutter-web-preview-0.1.0.vsix`。Marketplace 发布准备见[发布说明](docs/marketplace.md)。
+安装包输出到 `artifacts/flutter-web-preview-0.1.1.vsix`。Marketplace 发布准备见[发布说明](docs/marketplace.md)。
 
 ### 开始预览
 
@@ -52,7 +52,7 @@ npm run package
 
 更新采用**重新编译并刷新整个页面**，计数器等内存状态可能重置。断点和完整调试请使用 Dart/Flutter 官方扩展。
 
-运行预览会自动展开 **Debug Console / 调试控制台**，选择 **Flutter Web Preview** 会话即可查看应用日志。保存、刷新后继续采集，日志到达不会反复抢焦点；`developer.log` 的附加信息可展开对象查看。停止这个日志会话也会停止预览及 Flutter 服务。
+运行预览会自动展开 **Debug Console / 调试控制台**，选择 **Flutter Web Preview** 会话即可查看应用日志。保存、刷新后继续采集，日志到达不会反复抢焦点；`developer.log` 的附加信息可展开对象查看。停止这个日志会话也会停止预览及 Flutter 服务。关闭预览或执行 Stop 后，确认清理完成才输出一次 `exit: preview-… ended; Flutter stopped.`。Restart 会结束旧会话并启动新会话，保存更新和浏览器刷新不会输出退出标记。清理失败时显示停止失败，供重试。
 
 日志功能使用 VS Code 内置 JavaScript Debugger，无需修改 Dart 代码或 `launch.json`。如果连接失败，预览仍可使用；启用内置 JavaScript Debugger 后执行 **Open Preview Browser** 重试。多个同 URL 的浏览器标签存在时，按 VS Code 提示选择当前预览。
 
