@@ -3,13 +3,13 @@ import path from 'node:path';
 import { IntegratedBrowser } from './browser/integratedBrowser';
 import { PreviewConsole } from './browser/previewConsole';
 import { PreviewSessionController } from './core/controller';
-import { sessionId, type SessionState } from './core/types';
+import { sessionId, type SessionContext, type SessionState } from './core/types';
 import { FlutterProcessRuntime } from './flutter/flutterRuntime';
 import { belongsToProject, nearestProject } from './project/flutterProject';
 import { numericSetting, resolveLaunch } from './project/resolveLaunch';
 import { mainOffsets } from './ui/dartMain';
 
-export interface PreviewStatus { state: SessionState['kind']; projectRoot?: string; url?: string; error?: string; browserAvailable: boolean; logConsoleConnected: boolean; lastRefreshLatencyMs?: number }
+export interface PreviewStatus { state: SessionState['kind']; sessionId?: string; projectRoot?: string; url?: string; error?: string; browserAvailable: boolean; logConsoleConnected: boolean; lastRefreshLatencyMs?: number; lastCompilation?: SessionContext['lastCompilation']; refreshCount: number }
 export interface PreviewApi { getStatus(): PreviewStatus }
 let controller: PreviewSessionController | undefined;
 let browser: IntegratedBrowser | undefined;
@@ -132,7 +132,7 @@ export function activate(context: vscode.ExtensionContext): PreviewApi {
   log('Flutter Web Preview activated. Closing the preview stops its Flutter process.');
   return { getStatus: () => {
     const { state, context: current } = session.current;
-    return { state: state.kind, projectRoot: current.currentSpec?.projectRoot, url: current.url, browserAvailable: current.browserOpen, logConsoleConnected: current.logConsoleConnected ?? false, lastRefreshLatencyMs: current.lastRefreshLatencyMs, error: state.kind === 'failed' ? state.failure : state.kind === 'running' ? state.lastError ?? current.logError : undefined };
+    return { state: state.kind, sessionId: sessionId(state), projectRoot: current.currentSpec?.projectRoot, url: current.url, browserAvailable: current.browserOpen, logConsoleConnected: current.logConsoleConnected ?? false, lastRefreshLatencyMs: current.lastRefreshLatencyMs, lastCompilation: current.lastCompilation ? { ...current.lastCompilation } : undefined, refreshCount: current.refreshCount ?? 0, error: state.kind === 'failed' ? state.failure : state.kind === 'running' ? state.lastError ?? current.logError : undefined };
   } };
 }
 

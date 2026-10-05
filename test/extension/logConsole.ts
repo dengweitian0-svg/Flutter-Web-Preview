@@ -5,10 +5,9 @@ import path from 'node:path';
 import { createServer } from 'node:http';
 import type { PreviewApi } from '../../src/extension';
 import { checkPort } from '../../src/flutter/flutterRuntime';
-import { DevTools } from './devTools';
+import { DevTools, testPort, waitForText } from './devTools';
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-const previewPort = Number(process.env.PREVIEW_TEST_PORT ?? 7357);
 async function until(predicate: () => boolean | Promise<boolean>, timeout = 180000) {
   const start = Date.now();
   while (!await predicate()) { if (Date.now() - start > timeout) throw new Error('Log console test timed out'); await wait(100); }
@@ -25,14 +24,14 @@ export async function logConsoleStopTest(): Promise<void> {
   const initialSdk = config.inspect<string>('flutterSdkPath')?.workspaceValue;
   const initialPort = config.inspect<number>('port')?.workspaceValue;
   try {
-    await config.update('port', previewPort, vscode.ConfigurationTarget.Workspace);
+    await config.update('port', testPort, vscode.ConfigurationTarget.Workspace);
     if (process.env.FLUTTER_SDK_PATH) await config.update('flutterSdkPath', process.env.FLUTTER_SDK_PATH, vscode.ConfigurationTarget.Workspace);
     await vscode.commands.executeCommand('flutterWebPreview.run', file);
     await until(() => api.getStatus().state === 'failed' || api.getStatus().logConsoleConnected);
     assert.equal(api.getStatus().state, 'running', api.getStatus().error);
     await until(() => !!vscode.debug.activeDebugSession && !!rootSession(vscode.debug.activeDebugSession).configuration.flutterWebPreviewLogToken, 15000);
     await vscode.commands.executeCommand('workbench.action.debug.stop');
-    await until(() => api.getStatus().state === 'stopped', 15000); await checkPort(previewPort);
+    await until(() => api.getStatus().state === 'stopped', 15000); await checkPort(testPort);
     const artifacts = process.env.PREVIEW_ARTIFACTS_DIR ?? path.join(extension.extensionPath, 'artifacts'); await mkdir(artifacts, { recursive: true });
     await writeFile(path.join(artifacts, 'log-console-toolbar-stop.json'), JSON.stringify({ status: api.getStatus(), vscode: vscode.version, extensionPath: extension.extensionPath }, null, 2));
     console.log('LOG CONSOLE TOOLBAR STOP PASSED');
@@ -66,6 +65,7 @@ export async function logConsoleTest(): Promise<void> {
     },
   });
   let preview: DevTools | undefined; let workbench: DevTools | undefined;
+  let readySession: string | undefined; let readyDocument: string | undefined; let readyRefreshes = 0;
   let unrelated: vscode.DebugSession | undefined;
   const command = (name: string, ...args: unknown[]) => vscode.commands.executeCommand(`flutterWebPreview.${name}`, ...args);
   const server = createServer((_request, response) => { response.end('<title>Unrelated browser</title>Unrelated'); });
@@ -80,8 +80,16 @@ export async function logConsoleTest(): Promise<void> {
     await until(() => api.getStatus().state === 'failed' || api.getStatus().error?.includes('Cannot connect preview logs') || (api.getStatus().state === 'running' && api.getStatus().logConsoleConnected));
     assert.equal(api.getStatus().state, 'running', api.getStatus().error);
     assert.equal(api.getStatus().error, undefined);
-    preview?.close(); preview = await DevTools.connect(api.getStatus().url!);
-    await until(async () => (await preview!.text()).includes('Emit preview logs'), 60000);
+    const status = api.getStatus();
+    const previousDocument = status.sessionId !== readySession || status.refreshCount !== readyRefreshes ? readyDocument : undefined;
+    preview?.close();
+    const connection: { current?: DevTools } = {};
+    try {
+      // Reused tabs may still display the previous application's DOM during startup.
+      await waitForText(connection, status.url!, 'Emit preview logs', 60000, previousDocument);
+      readyDocument = await connection.current!.documentId(); readySession = status.sessionId; readyRefreshes = status.refreshCount;
+    }
+    finally { preview = connection.current; }
   };
   const emitAndCheck = async () => {
     // A real user clicks the visible browser, which may currently be behind a text tab.
@@ -118,8 +126,8 @@ export async function logConsoleTest(): Promise<void> {
     await workbench!.request('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
   };
   try {
+    await config.update('port', testPort, vscode.ConfigurationTarget.Workspace);
     await vscode.window.showTextDocument(document, vscode.ViewColumn.One);
-    await config.update('port', previewPort, vscode.ConfigurationTarget.Workspace);
     if (process.env.FLUTTER_SDK_PATH) await config.update('flutterSdkPath', process.env.FLUTTER_SDK_PATH, vscode.ConfigurationTarget.Workspace);
     await command('run', file); await ready();
     await until(() => vscode.window.activeTextEditor?.document.uri.toString() === file.toString(), 5000);
@@ -138,7 +146,7 @@ export async function logConsoleTest(): Promise<void> {
     await vscode.commands.executeCommand('workbench.action.browser.open', { reuseUrlFilter: `${new URL(api.getStatus().url!).origin}/**` });
     const initialTab = vscode.window.tabGroups.activeTabGroup.activeTab; assert(initialTab);
     await vscode.window.tabGroups.close(initialTab);
-    await until(() => api.getStatus().state === 'stopped', 15000); await checkPort(previewPort); await checkExit(initialConsole);
+    await until(() => api.getStatus().state === 'stopped', 15000); await checkPort(testPort); await checkExit(initialConsole);
     await command('showDebugConsole');
     await until(async () => String(await workbench!.evaluate(`document.querySelector('.repl')?.innerText`)).includes(`exit: ${initialConsole.configuration.flutterWebPreviewConsoleSessionId}`), 10000);
     await workbench!.screenshot(path.join(artifacts, 'debug-console-exit.png'));
@@ -153,8 +161,14 @@ export async function logConsoleTest(): Promise<void> {
     await command('reloadBrowser'); await wait(500); await ready(); await emitAndCheck();
     assert.equal(ownerToken(), token, 'Browser reload must reuse logging session');
     await vscode.window.showTextDocument(document);
+    const beforeSave = api.getStatus();
+    const beforeSaveDocument = await preview!.documentId();
     await replace(original.replace('Preview version 1', 'Preview logs saved'));
-    await until(async () => api.getStatus().state === 'running' && (await preview!.text()).includes('Preview logs saved'), 60000);
+    await until(() => api.getStatus().state === 'failed' || ((api.getStatus().lastCompilation?.operationId ?? 0) > (beforeSave.lastCompilation?.operationId ?? 0) && api.getStatus().refreshCount > beforeSave.refreshCount), 60000);
+    assert.equal(api.getStatus().state, 'running', api.getStatus().error);
+    const savedConnection = { current: preview };
+    try { await waitForText(savedConnection, api.getStatus().url!, 'Preview logs saved', 60000, beforeSaveDocument); }
+    finally { preview = savedConnection.current; }
     await wait(500); await ready();
     assert.equal(vscode.window.activeTextEditor?.document.uri.toString(), file.toString(), 'Save refresh must preserve editor focus');
     await emitAndCheck(); assert.equal(ownerToken(), token);
@@ -175,7 +189,7 @@ export async function logConsoleTest(): Promise<void> {
     await selectConsole(unrelated);
     await until(() => !!vscode.debug.activeDebugSession && rootSession(vscode.debug.activeDebugSession).id === unrelated!.id, 10000);
     assert.equal(rootSession(vscode.debug.activeDebugSession!).id, unrelated.id, 'Unrelated debugger must be active for the isolation test');
-    await command('stop'); await until(() => api.getStatus().state === 'stopped', 15000); await checkPort(previewPort);
+    await command('stop'); await until(() => api.getStatus().state === 'stopped', 15000); await checkPort(testPort);
     await checkExit(beforeStop);
     assert(!history.some(record => rootSession(record.session).id === unrelated!.id && record.body.output?.includes('[Flutter Web Preview] exit:')), 'Exit must not go to the active unrelated console');
     await command('stop'); assert.equal(exits(beforeStop).length, 1, 'Repeated Stop must not repeat exit');
@@ -191,14 +205,14 @@ export async function logConsoleTest(): Promise<void> {
     await selectConsole(beforeToolbarStop);
     await until(() => !!vscode.debug.activeDebugSession && !!rootSession(vscode.debug.activeDebugSession).configuration.flutterWebPreviewLogToken, 5000);
     await vscode.commands.executeCommand('workbench.action.debug.stop');
-    await until(() => api.getStatus().state === 'stopped', 15000); await checkPort(previewPort);
+    await until(() => api.getStatus().state === 'stopped', 15000); await checkPort(testPort);
     await checkExit(beforeToolbarStop);
     checks.push('Stopping the owned logging session stops the preview and releases the port');
     await command('run', file); await ready();
     const beforeClose = ownedConsole();
     await vscode.commands.executeCommand('workbench.action.browser.open', { reuseUrlFilter: `${new URL(api.getStatus().url!).origin}/**` });
     const tab = vscode.window.tabGroups.activeTabGroup.activeTab; assert(tab); await vscode.window.tabGroups.close(tab);
-    await until(() => api.getStatus().state === 'stopped', 15000); await checkPort(previewPort);
+    await until(() => api.getStatus().state === 'stopped', 15000); await checkPort(testPort);
     await checkExit(beforeClose);
     await command('showDebugConsole');
     await selectConsole(beforeClose);
@@ -208,7 +222,10 @@ export async function logConsoleTest(): Promise<void> {
     checks.push('Closing preview cleans up log session and Flutter');
     console.log(`LOG CONSOLE PASSED: ${checks.join('; ')}`);
   } catch (error) {
-    await writeFile(path.join(artifacts, 'log-console-failure.json'), JSON.stringify({ error: String(error), status: api.getStatus(), sessions: [...sessions.values()].map(session => ({ id: session.id, parent: session.parentSession?.id, configuration: session.configuration, ended: terminated.has(session.id) })), output: records.map(record => ({ session: record.session.id, body: record.body })), page: await preview?.evaluate(`[...document.querySelectorAll('[role="button"],button')].map(node => ({ html: node.outerHTML, rect: node.getBoundingClientRect().toJSON() }))`).catch(() => undefined) }, null, 2));
+    const failure = { error: error instanceof Error ? error.stack : String(error), checks: [...checks], status: api.getStatus(), readySession, readyDocument, readyRefreshes, preview: preview?.diagnostics(), workbench: workbench?.diagnostics(), sessions: [...sessions.values()].map(session => ({ id: session.id, parent: session.parentSession?.id, configuration: session.configuration, ended: terminated.has(session.id) })), output: records.map(record => ({ session: record.session.id, body: record.body })) };
+    await writeFile(path.join(artifacts, 'log-console-failure.json'), JSON.stringify(failure, null, 2));
+    const page = await preview?.evaluate(`[...document.querySelectorAll('[role="button"],button')].map(node => ({ html: node.outerHTML, rect: node.getBoundingClientRect().toJSON() }))`).catch(() => undefined);
+    await writeFile(path.join(artifacts, 'log-console-failure.json'), JSON.stringify({ ...failure, page }, null, 2));
     if (preview) await preview.screenshot(path.join(artifacts, 'log-console-failure.png')).catch(() => {});
     throw error;
   } finally {
