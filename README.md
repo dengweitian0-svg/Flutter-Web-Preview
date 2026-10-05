@@ -10,7 +10,7 @@ Flutter Web Preview 是面向本地 Windows 开发的 VS Code 扩展。它将 Fl
 - **应用日志可见**：自动连接预览浏览器，`print`、`debugPrint` 和 `dart:developer.log` 显示在调试控制台，包含点击和异步回调产生的输出。
 - **退出结果明确**：关闭预览或停止日志会话后，确认清理完成再输出一次 `exit`；停止失败会显示失败信息，供重试。
 
-[快速开始](#快速开始) · [应用日志与退出提示](#应用日志与退出提示) · [配置](#配置) · [常见问题与支持范围](#常见问题与支持范围) · [开发与验证](#开发与验证) · [English](#english-quick-start)
+[下载 VSIX v0.1.1](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.1/flutter-web-preview-0.1.1.vsix) · [快速开始](#快速开始) · [应用日志与退出提示](#应用日志与退出提示) · [配置](#配置) · [常见问题与支持范围](#常见问题与支持范围) · [开发与验证](#开发与验证) · [English](#english-quick-start)
 
 ## 快速开始
 
@@ -31,7 +31,9 @@ flutter pub get
 
 ### 安装扩展
 
-当前使用 VSIX 安装。已有 `flutter-web-preview-0.1.1.vsix` 时，在 VS Code 命令面板执行 **Extensions: Install from VSIX...** 并选择该文件。
+从 [GitHub Release v0.1.1](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/tag/v0.1.1) 下载附件，或[直接下载 `flutter-web-preview-0.1.1.vsix`](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.1/flutter-web-preview-0.1.1.vsix)。
+
+在 VS Code 按 `Ctrl + Shift + P`，执行 **Extensions: Install from VSIX...（从 VSIX 安装）**，选择下载的文件，安装完成后重新加载窗口。
 
 从旧版本更新时，先执行 **Stop Web Preview**，再通过 **Install from VSIX...** 选择新版安装包；安装完成后执行 **Developer: Reload Window**，重新运行预览即可使用新功能。
 
@@ -201,7 +203,9 @@ VS Code 1.140.0 由测试工具自动下载并缓存在 `.cache/vscode-test/`。
 
 Preview Flutter Web inside VS Code on **local Windows**. Use VS Code **1.140.0+** and a Flutter **3.35-series or later stable SDK**.
 
-Install the VSIX, open a trusted Flutter Web project, and run `flutter pub get`. Click **Run Web Preview** above the top-level `main()`, then save Dart files to recompile and refresh automatically. Close the preview tab to stop its Flutter server.
+Download the [v0.1.1 VSIX](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.1/flutter-web-preview-0.1.1.vsix) from [GitHub Releases](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/tag/v0.1.1). In VS Code, run **Extensions: Install from VSIX...**, select the downloaded file, and reload the window. When updating, stop the preview before installing the new version.
+
+Open a trusted Flutter Web project and run `flutter pub get`. Click **Run Web Preview** above the top-level `main()`, then save Dart files to recompile and refresh automatically. Close the preview tab to stop its Flutter server.
 
 Application logs appear automatically in the **Flutter Web Preview (preview-…)** Debug Console session, including `print`, `debugPrint`, and `dart:developer.log` from clicks and asynchronous callbacks. Use **Show Debug Console** to reopen it; expand developer log objects for metadata. Build and process diagnostics remain in the **Flutter Web Preview** Output channel.
 
