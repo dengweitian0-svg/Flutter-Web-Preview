@@ -19,6 +19,16 @@ function setup() {
 }
 afterEach(() => vi.useRealTimers());
 describe('update scheduling and cleanup', () => {
+  it('a manual update consumes a pending save without a redundant compilation', async () => {
+    vi.useFakeTimers(); const app = setup();
+    app.controller.save(300);
+    await vi.advanceTimersByTimeAsync(100);
+    app.controller.dispatch({ type: 'UPDATE', reason: 'manual' });
+    app.compile({ code: 0 }); await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(app.runtime.recompile).toHaveBeenCalledTimes(1);
+    const cleanup = app.controller.dispose(); app.finishStop(); await cleanup;
+  });
   it('reports exit only after both process and browser cleanup have completed', async () => {
     const app = setup(); let finishBrowser!: () => void;
     app.browser.release.mockImplementation(() => new Promise<void>(resolve => { finishBrowser = resolve; }));

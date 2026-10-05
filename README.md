@@ -10,7 +10,7 @@ Flutter Web Preview 是面向本地 Windows 开发的 VS Code 扩展。它将 Fl
 - **应用日志可见**：自动连接预览浏览器，`print`、`debugPrint` 和 `dart:developer.log` 显示在调试控制台，包含点击和异步回调产生的输出。
 - **退出结果明确**：关闭预览或停止日志会话后，确认清理完成再输出一次 `exit`；停止失败会显示失败信息，供重试。
 
-[下载 VSIX v0.1.1](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.1/flutter-web-preview-0.1.1.vsix) · [快速开始](#快速开始) · [应用日志与退出提示](#应用日志与退出提示) · [配置](#配置) · [常见问题与支持范围](#常见问题与支持范围) · [开发与验证](#开发与验证) · [English](#english-quick-start)
+[下载 VSIX v0.1.2](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.2/flutter-web-preview-0.1.2.vsix) · [快速开始](#快速开始) · [应用日志与退出提示](#应用日志与退出提示) · [配置](#配置) · [常见问题与支持范围](#常见问题与支持范围) · [开发与验证](#开发与验证) · [English](#english-quick-start)
 
 ## 快速开始
 
@@ -31,7 +31,7 @@ flutter pub get
 
 ### 安装扩展
 
-从 [GitHub Release v0.1.1](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/tag/v0.1.1) 下载附件，或[直接下载 `flutter-web-preview-0.1.1.vsix`](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.1/flutter-web-preview-0.1.1.vsix)。
+从 [GitHub Release v0.1.2](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/tag/v0.1.2) 下载附件，或[直接下载 `flutter-web-preview-0.1.2.vsix`](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.2/flutter-web-preview-0.1.2.vsix)。
 
 在 VS Code 按 `Ctrl + Shift + P`，执行 **Extensions: Install from VSIX...（从 VSIX 安装）**，选择下载的文件，安装完成后重新加载窗口。
 
@@ -44,7 +44,7 @@ npm ci
 npm run package
 ```
 
-安装包输出到 `artifacts/flutter-web-preview-0.1.1.vsix`。Marketplace 发布准备见[发布说明](docs/marketplace.md)。
+源码当前生成 `artifacts/flutter-web-preview-0.1.2.vsix`（性能修复版）。Marketplace 发布准备见[发布说明](docs/marketplace.md)。
 
 ### 开始预览
 
@@ -56,6 +56,10 @@ npm run package
 多根工作区支持选择项目，每个 VS Code 窗口同时运行一个预览。保存其他项目的文件不会更新当前预览。
 
 更新采用**重新编译并刷新整个页面**，计数器等内存状态可能重置。断点和完整调试请使用 Dart/Flutter 官方扩展。
+
+预览使用适合整页刷新的编译模式、从本地 Flutter 服务加载 CanvasKit，并关闭日志连接中不需要的源码映射处理。首次启动仍需编译项目；应用自己的网络请求及 Flutter 的字体回退也可能影响显示速度。Output 会分别记录服务就绪和编译耗时；它们不代表页面已完成渲染。
+
+本机样例对比：启动约 29.1 → 17.6 秒，三次保存刷新平均约 5.0 → 2.6 秒。测试方法与适用范围见[性能验证](docs/performance.md)。
 
 ## 应用日志与退出提示
 
@@ -203,7 +207,7 @@ VS Code 1.140.0 由测试工具自动下载并缓存在 `.cache/vscode-test/`。
 
 Preview Flutter Web inside VS Code on **local Windows**. Use VS Code **1.140.0+** and a Flutter **3.35-series or later stable SDK**.
 
-Download the [v0.1.1 VSIX](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.1/flutter-web-preview-0.1.1.vsix) from [GitHub Releases](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/tag/v0.1.1). In VS Code, run **Extensions: Install from VSIX...**, select the downloaded file, and reload the window. When updating, stop the preview before installing the new version.
+Download the [v0.1.2 VSIX](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.2/flutter-web-preview-0.1.2.vsix) from [GitHub Releases](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/tag/v0.1.2). In VS Code, run **Extensions: Install from VSIX...**, select the downloaded file, and reload the window. When updating, stop the preview before installing the new version.
 
 Open a trusted Flutter Web project and run `flutter pub get`. Click **Run Web Preview** above the top-level `main()`, then save Dart files to recompile and refresh automatically. Close the preview tab to stop its Flutter server.
 

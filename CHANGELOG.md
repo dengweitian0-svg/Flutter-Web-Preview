@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2
+
+- Serve CanvasKit locally and use the restart-oriented web compiler without Dart expression evaluation metadata to reduce startup and page refresh overhead.
+- Capture browser logs without source-map parsing, script pauses for source maps, or asynchronous debugger stack tracking.
+- Consume pending save debounce timers when compilation begins, avoiding a redundant compile after manual reload.
+- Add a real VS Code performance test that measures time until the Flutter page visibly updates, with the log connection active.
+
 ## 0.1.1
 
 - Keep an owned lifecycle console alive after browser closure, emit exactly one confirmed exit marker, and merge browser logs into it.

@@ -8,10 +8,35 @@ async function fakeSdk(program: string): Promise<{ root: string; spec: LaunchSpe
   const root = await mkdtemp(path.resolve('.cache/runtime-test-'));
   await mkdir(path.join(root, 'bin'));
   const encoded = Buffer.from(program).toString('base64');
-  await writeFile(path.join(root, 'bin', 'flutter.bat'), `@echo off\r\n"${process.execPath}" -e "eval(Buffer.from('${encoded}','base64').toString())"\r\n`);
+  await writeFile(path.join(root, 'bin', 'flutter.bat'), `@echo off\r\n"${process.execPath}" -e "eval(Buffer.from('${encoded}','base64').toString())" -- %*\r\n`);
   return { root, spec: { projectRoot: root, entrypoint: 'lib/main.dart', sdkPath: root, port: 7369, startupTimeout: 10000, reloadTimeout: 1000 } };
 }
 describe.skipIf(process.platform !== 'win32')('managed Flutter process cleanup', () => {
+  it('uses local web resources and the restart compiler while keeping incremental compilation failures recoverable', async () => {
+    const fixture = await fakeSdk(`
+      require('node:fs').writeFileSync('args.json', JSON.stringify(process.argv.slice(1)));
+      process.stdout.write(JSON.stringify([{event:'app.start',params:{appId:'app'}}])+'\\n');
+      let count = 0;
+      require('node:readline').createInterface({input:process.stdin}).on('line', line => {
+        const request = JSON.parse(line)[0];
+        if (request.method === 'app.stop') process.exit(0);
+        require('node:fs').writeFileSync('request.json', JSON.stringify(request));
+        process.stdout.write(JSON.stringify([{id:request.id,result:{code:count++ === 0 ? 1 : 0,message:'result'}}])+'\\n');
+      });
+    `);
+    const runtime = new FlutterProcessRuntime(() => {});
+    const ready = new Promise<void>(resolve => runtime.events.subscribe(event => { if (event.type === 'APP_ID') resolve(); }));
+    try {
+      await runtime.start('updates', fixture.spec); await ready;
+      const args = JSON.parse(await readFile(path.join(fixture.root, 'args.json'), 'utf8')) as string[];
+      expect(args).toEqual(expect.arrayContaining(['--machine', 'web-server', '--no-web-resources-cdn', '--no-web-experimental-hot-reload', '--no-web-enable-expression-evaluation']));
+      expect(args).not.toContain('--no-pub');
+      expect(await runtime.recompile('updates', 'save', 1000)).toMatchObject({ code: 1 });
+      expect(await runtime.recompile('updates', 'save', 1000)).toMatchObject({ code: 0 });
+      const request = JSON.parse(await readFile(path.join(fixture.root, 'request.json'), 'utf8'));
+      expect(request).toMatchObject({ method: 'app.restart', params: { appId: 'app', fullRestart: true } });
+    } finally { await runtime.stop('updates'); await rm(fixture.root, { recursive: true, force: true }); }
+  });
   it('cancels a start before the process is created', async () => {
     const fixture = await fakeSdk("require('node:fs').writeFileSync('started.txt','yes')");
     const runtime = new FlutterProcessRuntime(() => {});
