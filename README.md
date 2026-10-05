@@ -8,8 +8,9 @@ Flutter Web Preview 是面向本地 Windows 开发的 VS Code 扩展。它将 Fl
 - **预览管理服务**：首次手动启动，关闭预览标签后停止对应 Flutter 服务并释放端口；之后保存文件不会重新启动。
 - **编译失败可恢复**：保留上一次成功的页面，修复错误并保存后继续更新；状态栏和 Output 提供运行状态与日志。
 - **应用日志可见**：自动连接预览浏览器，`print`、`debugPrint` 和 `dart:developer.log` 显示在调试控制台，包含点击和异步回调产生的输出。
+- **退出结果明确**：关闭预览或停止日志会话后，确认清理完成再输出一次 `exit`；停止失败会显示失败信息，供重试。
 
-[快速开始](#快速开始) · [配置](#配置) · [常见问题与支持范围](#常见问题与支持范围) · [开发与验证](#开发与验证) · [English](#english-quick-start)
+[快速开始](#快速开始) · [应用日志与退出提示](#应用日志与退出提示) · [配置](#配置) · [常见问题与支持范围](#常见问题与支持范围) · [开发与验证](#开发与验证) · [English](#english-quick-start)
 
 ## 快速开始
 
@@ -32,6 +33,8 @@ flutter pub get
 
 当前使用 VSIX 安装。已有 `flutter-web-preview-0.1.1.vsix` 时，在 VS Code 命令面板执行 **Extensions: Install from VSIX...** 并选择该文件。
 
+从旧版本更新时，先执行 **Stop Web Preview**，再通过 **Install from VSIX...** 选择新版安装包；安装完成后执行 **Developer: Reload Window**，重新运行预览即可使用新功能。
+
 也可以从源码生成安装包。下载或克隆本仓库后，在仓库根目录执行（建议使用 Node.js 24，与 CI 配置一致）：
 
 ```powershell
@@ -52,7 +55,23 @@ npm run package
 
 更新采用**重新编译并刷新整个页面**，计数器等内存状态可能重置。断点和完整调试请使用 Dart/Flutter 官方扩展。
 
-运行预览会自动展开 **Debug Console / 调试控制台**，选择 **Flutter Web Preview** 会话即可查看应用日志。保存、刷新后继续采集，日志到达不会反复抢焦点；`developer.log` 的附加信息可展开对象查看。停止这个日志会话也会停止预览及 Flutter 服务。关闭预览或执行 Stop 后，确认清理完成才输出一次 `exit: preview-… ended; Flutter stopped.`。Restart 会结束旧会话并启动新会话，保存更新和浏览器刷新不会输出退出标记。清理失败时显示停止失败，供重试。
+## 应用日志与退出提示
+
+运行预览会自动展开 **Debug Console / 调试控制台**。选择当前的 **Flutter Web Preview (preview-…)** 会话，查看 `print`、`debugPrint`、`dart:developer.log` 或输出到浏览器控制台的日志库内容。按钮点击、事件和异步回调产生的日志都可采集；中文、多行和连续相同消息保留，`developer.log` 的名称、级别、错误和堆栈等信息可展开对象查看。
+
+保存和浏览器刷新会继续使用当前预览控制台；日志到达不会反复抢焦点。编译、进程及插件诊断位于 **输出 → Flutter Web Preview**，可通过 **Show Output** 打开；应用日志可通过 **Show Debug Console** 查看。
+
+关闭预览标签、执行 **Stop Web Preview**，或停止所属日志会话后，插件确认 Flutter 及浏览器连接清理完成，再向对应控制台输出一次退出提示：
+
+```text
+[Flutter Web Preview] start: preview-1
+…应用日志…
+[Flutter Web Preview] exit: preview-1 ended; Flutter stopped.
+```
+
+退出提示在浏览器关闭后仍可查看。**Restart Web Preview** 会结束旧会话并为新会话显示 `start`；保存更新、仅刷新和重新绑定不会误报预览退出。清理失败时显示 `stop failed`，可再次执行 **Stop Web Preview**；尚未确认停止时不会显示成功退出，也不会编造退出码。
+
+每个预览使用独立控制台，退出提示不会写到其他活动调试会话。如果存在多个会话，请在控制台下拉列表选择相应的 **Flutter Web Preview (preview-…)**，包括已经结束的会话。
 
 日志功能使用 VS Code 内置 JavaScript Debugger，无需修改 Dart 代码或 `launch.json`。如果连接失败，预览仍可使用；启用内置 JavaScript Debugger 后执行 **Open Preview Browser** 重试。多个同 URL 的浏览器标签存在时，按 VS Code 提示选择当前预览。
 
@@ -125,6 +144,8 @@ SDK、端口、默认入口和启动超时在下次启动或 **Restart Web Previ
 | 找不到 Flutter SDK | 设置 `flutterSdkPath` 为包含 `bin/flutter.bat` 的 SDK 根目录 |
 | 项目缺少 Web 支持 | 为应用添加 Flutter Web 支持，确认存在 `web/` 后再启动 |
 | Dart 编译错误 | 查看 **Show Output**，修复并保存；旧页面保留 |
+| 应用日志没有显示 | 打开 **Show Debug Console** 并选择当前预览会话；确认内置 JavaScript Debugger 已启用，必要时执行 **Open Preview Browser** 重试 |
+| 停止时显示 `stop failed` | 查看 **Show Output** 的诊断后再次执行 **Stop Web Preview**；成功清理后才显示 `exit` |
 | 启动、编译超时或协议失效 | 当前会话停止并清理；查看 **Show Output** 后再次运行 |
 | 修改资源或 `pubspec.yaml` | 按需执行 `flutter pub get`，再 **Restart Web Preview** |
 
@@ -166,7 +187,7 @@ $env:PREVIEW_STRESS_CYCLES = '20'
 npm run test:extension
 ```
 
-VS Code 1.140.0 由测试工具自动下载并缓存在 `.cache/vscode-test/`。已有可用 SDK 时，也可省略下载步骤，通过 `PATH` 自动查找 Flutter。`VSCODE_EXECUTABLE` 和 `FLUTTER_SDK_PATH` 保留为可选的本机覆盖，不必写入仓库文件。将 `PREVIEW_TEST_MODE` 设为 `browser` 可单独测试浏览器适配器，设为 `logs` 可验证真实 Flutter 点击及异步日志、调试控制台显示、刷新和会话清理。
+VS Code 1.140.0 由测试工具自动下载并缓存在 `.cache/vscode-test/`。已有可用 SDK 时，也可省略下载步骤，通过 `PATH` 自动查找 Flutter。`VSCODE_EXECUTABLE` 和 `FLUTTER_SDK_PATH` 保留为可选的本机覆盖，不必写入仓库文件。将 `PREVIEW_TEST_MODE` 设为 `browser` 可单独测试浏览器适配器，设为 `logs` 可验证真实 Flutter 点击及异步日志、对象展开、退出提示可见性与一次性、刷新不误报及其他活动会话隔离。
 
 安装生命周期测试脚本也支持自动下载 VS Code；运行它之前，仍需将生成的 VSIX 安装到仓库 `.cache/vsix-extensions/` 测试扩展目录。
 
@@ -182,7 +203,9 @@ Preview Flutter Web inside VS Code on **local Windows**. Use VS Code **1.140.0+*
 
 Install the VSIX, open a trusted Flutter Web project, and run `flutter pub get`. Click **Run Web Preview** above the top-level `main()`, then save Dart files to recompile and refresh automatically. Close the preview tab to stop its Flutter server.
 
-Application logs appear automatically in the **Flutter Web Preview** Debug Console session, including `print`, `debugPrint`, and `dart:developer.log` from clicks and asynchronous callbacks. Use **Show Debug Console** to reopen it. Stopping this logging session also stops the preview.
+Application logs appear automatically in the **Flutter Web Preview (preview-…)** Debug Console session, including `print`, `debugPrint`, and `dart:developer.log` from clicks and asynchronous callbacks. Use **Show Debug Console** to reopen it; expand developer log objects for metadata. Build and process diagnostics remain in the **Flutter Web Preview** Output channel.
+
+Closing the preview, running **Stop Web Preview**, or stopping its logging session produces one `exit: preview-… ended; Flutter stopped.` message after cleanup is confirmed. The message remains in its own console after the browser closes. Restart ends the old session and starts a new one; save, refresh, and rebind do not emit exit messages. Failed cleanup shows `stop failed` and can be retried with **Stop Web Preview**.
 
 To build the VSIX from this repository, run `npm ci` followed by `npm run package`; the package is written to `artifacts/`. Page state may reset on refresh. If moving a tab pauses updates, use **Open Preview Browser** to explicitly bind it again. Flutter is resolved from extension settings, `dart.flutterSdkPath`, or `PATH`.
 
