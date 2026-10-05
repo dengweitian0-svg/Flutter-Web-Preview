@@ -70,6 +70,17 @@ describe('session transitions', () => {
     expect(failure.effects.map(e => e.type)).toEqual(['REPORT']);
     expect(step(failure, { type: 'UPDATE', reason: 'save' }).state.kind).toBe('updating');
   });
+  it('keeps compilation outcomes separate from log errors and rejects stale outcomes', () => {
+    const logged = step(ready(), { type: 'LOG_SESSION_ERROR', sessionId: 'preview-1', bindingId: 'tab-1', message: 'Attach failed' });
+    expect(logged.context.lastCompilation).toBeUndefined();
+    const update = step(logged, { type: 'UPDATE', reason: 'save' });
+    const failed = step(update, { type: 'COMPILED', sessionId: 'preview-1', operationId: 2, code: 1, message: 'Invalid Dart', completedAt: 100 });
+    expect(failed.context.lastCompilation).toEqual({ operationId: 2, code: 1, message: 'Invalid Dart', completedAt: 100 });
+    expect(failed.context.logError).toBe('Attach failed');
+    expect(step(failed, { type: 'COMPILED', sessionId: 'preview-1', operationId: 2, code: 0 }).context.lastCompilation?.code).toBe(1);
+    const clean = step(step(failed, { type: 'STOP' }), { type: 'CLEANED', sessionId: 'preview-1' });
+    expect(step(clean, { type: 'RUN', spec }).context.lastCompilation).toBeUndefined();
+  });
   it('merges saves during compilation into one pending update', () => {
     const update = step(ready(), { type: 'UPDATE', reason: 'save' });
     const saved = step(step(update, { type: 'SAVE' }), { type: 'SAVE' });
@@ -127,6 +138,8 @@ describe('session transitions', () => {
   it('feeds browser refresh results back into the owned session and ignores stale bindings', () => {
     const current = step(ready(), { type: 'BROWSER_REFRESHED', sessionId: 'preview-1', bindingId: 'tab-1', latencyMs: 80 });
     expect(current.context.lastRefreshLatencyMs).toBe(80);
+    expect(current.context.refreshCount).toBe(1);
+    expect(step(current, { type: 'BROWSER_REFRESHED', sessionId: 'preview-1', bindingId: 'old', latencyMs: 999 }).context.refreshCount).toBe(1);
     expect(step(current, { type: 'BROWSER_REFRESHED', sessionId: 'preview-1', bindingId: 'old', latencyMs: 999 }).context.lastRefreshLatencyMs).toBe(80);
     const stopping = step(current, { type: 'STOP' });
     expect(step(stopping, { type: 'BROWSER_REFRESHED', sessionId: 'preview-1', bindingId: 'tab-1', latencyMs: 999 }).context.lastRefreshLatencyMs).toBe(80);

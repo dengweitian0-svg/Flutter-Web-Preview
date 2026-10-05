@@ -26,6 +26,8 @@ export interface SessionContext {
   currentSpec?: LaunchSpec;
   sequence: number;
   lastRefreshLatencyMs?: number;
+  lastCompilation?: CompileResult & { operationId: number };
+  refreshCount?: number;
   logConsoleConnected?: boolean;
   logError?: string;
 }
