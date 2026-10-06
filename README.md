@@ -57,9 +57,9 @@ npm run package
 
 更新采用**重新编译并刷新整个页面**，计数器等内存状态可能重置。断点和完整调试请使用 Dart/Flutter 官方扩展。
 
-预览使用适合整页刷新的编译模式、从本地 Flutter 服务加载 CanvasKit，并关闭日志连接中不需要的源码映射处理。首次启动仍需编译项目；应用自己的网络请求及 Flutter 的字体回退也可能影响显示速度。Output 会分别记录服务就绪和编译耗时；它们不代表页面已完成渲染。
+预览使用当前 Flutter SDK 的默认 Web 编译模式、从本地 Flutter 服务加载 CanvasKit，并关闭日志连接中不需要的源码映射处理。保存更新仍通过完整重启编译并刷新页面。首次启动仍需编译项目；应用自己的网络请求及 Flutter 的字体回退也可能影响显示速度。Output 会分别记录服务就绪和编译耗时；它们不代表页面已完成渲染。
 
-本机样例对比：启动约 29.1 → 17.6 秒，三次保存刷新平均约 5.0 → 2.6 秒。测试方法与适用范围见[性能验证](docs/performance.md)。
+v0.1.2 使用当时 SDK 和编译参数的本机样例对比：启动约 29.1 → 17.6 秒，三次保存刷新平均约 5.0 → 2.6 秒。这是历史测量，不代表采用 SDK 默认编译模式后的耗时。测试方法与适用范围见[性能验证](docs/performance.md)。
 
 ## 应用日志与退出提示
 
@@ -154,6 +154,7 @@ SDK、端口、默认入口和启动超时在下次启动或 **Restart Web Previ
 | 跨编辑组移动后暂停更新 | 标签身份可能变化；执行 **Open Preview Browser** 显式重新绑定，或 **Stop Web Preview** 结束会话 |
 | 端口被占用 | 修改 `port` 后重新启动；扩展不会结束占用端口的其他进程 |
 | 找不到 Flutter SDK | 设置 `flutterSdkPath` 为包含 `bin/flutter.bat` 的 SDK 根目录 |
+| 启动提示不支持 `--no-web-experimental-hot-reload` | 旧版扩展固定传入了已被新 SDK 删除的参数；安装包含此修复的版本。SDK 查找顺序为 `flutterWebPreview.flutterSdkPath`、`dart.flutterSdkPath`、`PATH`，确认检查的是扩展实际使用的 SDK |
 | 项目缺少 Web 支持 | 为应用添加 Flutter Web 支持，确认存在 `web/` 后再启动 |
 | Dart 编译错误 | 查看 **Show Output**，修复并保存；旧页面保留 |
 | 应用日志没有显示 | 打开 **Show Debug Console** 并选择当前预览会话；确认内置 JavaScript Debugger 已启用，必要时执行 **Open Preview Browser** 重试 |

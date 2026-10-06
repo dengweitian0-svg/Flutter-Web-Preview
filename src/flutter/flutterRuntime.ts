@@ -38,11 +38,12 @@ export class FlutterProcessRuntime implements FlutterRuntime {
       await access(path.join(spec.sdkPath, 'bin', 'flutter.bat'));
       await checkPort(spec.port);
       if (session.cancelled) return;
-      // web-server cannot apply stateful hot reload. The restart-oriented AMD
-      // compiler avoids the library-bundle overhead on full page reloads.
+      // Use the SDK's default web compiler: newer SDKs have removed the
+      // web-experimental-hot-reload flag. Updates use app.restart with
+      // fullRestart independently of the compiler's hot reload support.
       // Serve the renderer locally and omit Dart debugger evaluation metadata;
       // application console logging uses the browser debugger independently.
-      const args = ['--suppress-analytics', 'run', '--machine', '-d', 'web-server', '--no-web-resources-cdn', '--no-web-experimental-hot-reload', '--no-web-enable-expression-evaluation', '--web-hostname', '127.0.0.1', '--web-port', String(spec.port), '--target', spec.entrypoint];
+      const args = ['--suppress-analytics', 'run', '--machine', '-d', 'web-server', '--no-web-resources-cdn', '--no-web-enable-expression-evaluation', '--web-hostname', '127.0.0.1', '--web-port', String(spec.port), '--target', spec.entrypoint];
       this.log(`Starting Flutter in ${spec.projectRoot}\nflutter ${args.join(' ')}\n`);
       const child = spawnFlutter(spec.sdkPath, args, spec.projectRoot);
       session.process = child;

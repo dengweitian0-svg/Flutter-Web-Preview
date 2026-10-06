@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Remove the obsolete `--no-web-experimental-hot-reload` launch flag so Flutter SDKs that no longer accept it can start. Use the SDK's default web compiler while retaining full-restart updates, local CanvasKit resources and browser logging.
+
 ## 0.1.4
 
 - Add **Save and Reload Web Preview** and a Ctrl+S / Cmd+S binding scoped to local Dart editors while a preview is active. Successful explicit saves update the preview even when VS Code omits the will-save notification; already saved files can also request an update.

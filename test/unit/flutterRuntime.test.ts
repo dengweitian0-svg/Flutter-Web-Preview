@@ -12,8 +12,12 @@ async function fakeSdk(program: string): Promise<{ root: string; spec: LaunchSpe
   return { root, spec: { projectRoot: root, entrypoint: 'lib/main.dart', sdkPath: root, port: 7369, startupTimeout: 10000, reloadTimeout: 1000 } };
 }
 describe.skipIf(process.platform !== 'win32')('managed Flutter process cleanup', () => {
-  it('uses local web resources and the restart compiler while keeping incremental compilation failures recoverable', async () => {
+  it('starts with an SDK that removed the experimental hot reload flag and keeps compilation failures recoverable', async () => {
     const fixture = await fakeSdk(`
+      if (process.argv.slice(1).some(arg => /^--(?:no-)?web-experimental-hot-reload$/.test(arg))) {
+        process.stderr.write('Could not find an option named "--no-web-experimental-hot-reload".\\n');
+        process.exit(64);
+      }
       require('node:fs').writeFileSync('args.json', JSON.stringify(process.argv.slice(1)));
       process.stdout.write(JSON.stringify([{event:'app.start',params:{appId:'app'}}])+'\\n');
       let count = 0;
@@ -29,7 +33,9 @@ describe.skipIf(process.platform !== 'win32')('managed Flutter process cleanup',
     try {
       await runtime.start('updates', fixture.spec); await ready;
       const args = JSON.parse(await readFile(path.join(fixture.root, 'args.json'), 'utf8')) as string[];
-      expect(args).toEqual(expect.arrayContaining(['--machine', 'web-server', '--no-web-resources-cdn', '--no-web-experimental-hot-reload', '--no-web-enable-expression-evaluation']));
+      expect(args).toEqual(expect.arrayContaining(['--machine', 'web-server', '--no-web-resources-cdn', '--no-web-enable-expression-evaluation']));
+      expect(args).not.toContain('--no-web-experimental-hot-reload');
+      expect(args).not.toContain('--web-experimental-hot-reload');
       expect(args).not.toContain('--no-pub');
       expect(await runtime.recompile('updates', 'save', 1000)).toMatchObject({ code: 1 });
       expect(await runtime.recompile('updates', 'save', 1000)).toMatchObject({ code: 0 });
