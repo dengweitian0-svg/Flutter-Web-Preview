@@ -13,6 +13,7 @@ interface SaveHost {
 export class SaveAdapter {
   private readonly reasons = new WeakMap<SaveDocument, TextDocumentSaveReason>();
   private readonly operations = new WeakMap<SaveDocument, { target?: SaveTarget; version: number; result: Promise<boolean> }>();
+  private readonly saving = new WeakSet<SaveDocument>();
   private disposed = false;
   constructor(private readonly host: SaveHost) {}
 
@@ -24,8 +25,9 @@ export class SaveAdapter {
     const reason = this.reasons.get(document);
     this.reasons.delete(document);
     // Capture ownership synchronously, before any project lookup can yield.
-    if (this.operations.has(document)) return;
     const target = this.host.target();
+    const pending = this.operations.get(document);
+    if (this.saving.has(document) || (target && pending?.target?.sessionId === target.sessionId && pending.version === document.version)) return;
     await this.request(document, target, reason);
   }
 
@@ -40,9 +42,17 @@ export class SaveAdapter {
     operation.result = (pending ? pending.result.catch(() => false) : Promise.resolve()).then(async () => {
       try {
         if (this.disposed || document.isClosed) return false;
-        const saved = !document.isDirty || await document.save();
+        let saved = !document.isDirty;
+        if (!saved) {
+          this.saving.add(document);
+          try { saved = await document.save(); }
+          finally { this.saving.delete(document); }
+        }
         if (saved && !document.isDirty && !document.isClosed) {
-          await this.request(document, target, TextDocumentSaveReason.Manual, true);
+          // Save participants may edit the document. Pin the version actually
+          // saved, so a later Auto Save cannot become this manual request.
+          operation.version = document.version;
+          await this.request(document, target, TextDocumentSaveReason.Manual, operation.version);
         }
         return saved;
       } finally {
@@ -56,10 +66,10 @@ export class SaveAdapter {
     return operation.result;
   }
 
-  private async request(document: SaveDocument, target: SaveTarget | undefined, reason: TextDocumentSaveReason | undefined, requireSaved = false): Promise<void> {
+  private async request(document: SaveDocument, target: SaveTarget | undefined, reason: TextDocumentSaveReason | undefined, savedVersion?: number): Promise<void> {
     if (this.disposed || !target || document.uri.scheme !== 'file' || !document.fileName.toLowerCase().endsWith('.dart') || !this.host.isCurrent(target)) return;
     if (!await this.host.belongs(document, target) || this.disposed || !this.host.isCurrent(target)) return;
-    if (requireSaved && (document.isDirty || document.isClosed)) return;
+    if (savedVersion !== undefined && (document.version !== savedVersion || document.isDirty || document.isClosed)) return;
     this.host.request(target, reason);
   }
 }

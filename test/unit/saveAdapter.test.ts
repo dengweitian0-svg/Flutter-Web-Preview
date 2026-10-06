@@ -93,6 +93,69 @@ describe('explicit save intent and native save events', () => {
     lookup.resolve(true); await operation; expect(app.request).not.toHaveBeenCalled();
   });
 
+  it('does not turn a later Auto Save into the earlier manual update during a slow lookup', async () => {
+    const app = setup(); const lookup = deferred<boolean>(); app.belongs.mockReturnValueOnce(lookup.promise);
+    const manual = app.adapter.saveAndReload(app.document);
+    await Promise.resolve(); await Promise.resolve();
+    app.document.version++; app.document.isDirty = false;
+    app.adapter.willSave(app.document, TextDocumentSaveReason.AfterDelay);
+    await app.adapter.didSave(app.document);
+    lookup.resolve(true); await manual;
+    expect(app.request).toHaveBeenCalledExactlyOnceWith(expect.anything(), TextDocumentSaveReason.AfterDelay);
+  });
+
+  it('retains save participant edits but rejects newer changes after that saved version', async () => {
+    const app = setup();
+    app.document.save.mockImplementation(async () => {
+      app.document.version++; app.document.isDirty = false;
+      app.adapter.willSave(app.document, TextDocumentSaveReason.Manual);
+      await app.adapter.didSave(app.document);
+      return true;
+    });
+    await app.adapter.saveAndReload(app.document);
+    expect(app.request).toHaveBeenCalledExactlyOnceWith(expect.anything(), TextDocumentSaveReason.Manual);
+  });
+
+  it('does not let old-session validation swallow a native save from a new session', async () => {
+    const app = setup(); const lookup = deferred<boolean>(); app.belongs.mockReturnValueOnce(lookup.promise);
+    const old = app.adapter.saveAndReload(app.document);
+    await Promise.resolve(); await Promise.resolve();
+    app.setTarget({ sessionId: 'preview-2', projectRoot: 'D:/app' });
+    app.adapter.willSave(app.document, TextDocumentSaveReason.Manual);
+    await app.adapter.didSave(app.document);
+    lookup.resolve(true); await old;
+    expect(app.request).toHaveBeenCalledExactlyOnceWith({ sessionId: 'preview-2', projectRoot: 'D:/app' }, TextDocumentSaveReason.Manual);
+  });
+
+  it('keeps ownership of in-flight save notifications after a session change', async () => {
+    const app = setup(); const saved = deferred<boolean>();
+    app.document.save.mockImplementation(async () => {
+      await saved.promise; app.document.isDirty = false;
+      app.adapter.willSave(app.document, TextDocumentSaveReason.Manual);
+      await app.adapter.didSave(app.document);
+      return true;
+    });
+    const old = app.adapter.saveAndReload(app.document); await Promise.resolve();
+    app.setTarget({ sessionId: 'preview-2', projectRoot: 'D:/app' });
+    saved.resolve(true); await old; expect(app.request).not.toHaveBeenCalled();
+  });
+
+  it('suppresses in-flight save participant events even with a newer queued edit', async () => {
+    const app = setup(); const saved = deferred<boolean>();
+    app.document.save.mockImplementationOnce(async () => {
+      await saved.promise; app.document.version++; app.document.isDirty = false;
+      app.adapter.willSave(app.document, TextDocumentSaveReason.Manual);
+      await app.adapter.didSave(app.document);
+      return true;
+    });
+    const first = app.adapter.saveAndReload(app.document); await Promise.resolve();
+    app.document.version++;
+    const second = app.adapter.saveAndReload(app.document);
+    saved.resolve(true); await Promise.all([first, second]);
+    // The two explicit commands are independent; there is no passive third request.
+    expect(app.request).toHaveBeenCalledTimes(2);
+  });
+
   it('does not update on failed or cancelled saves and clears their reason', async () => {
     const app = setup();
     app.document.save.mockImplementation(async () => { app.adapter.willSave(app.document, TextDocumentSaveReason.Manual); return false; });
