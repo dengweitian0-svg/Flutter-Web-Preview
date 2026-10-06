@@ -26,6 +26,7 @@ export async function endToEnd(): Promise<void> {
   const config = vscode.workspace.getConfiguration('flutterWebPreview', file);
   const initialSdk = config.inspect<string>('flutterSdkPath')?.workspaceValue;
   const initialReload = config.inspect<boolean>('reloadOnSave')?.workspaceValue;
+  const initialReloadOnAutoSave = config.inspect<boolean>('reloadOnAutoSave')?.workspaceValue;
   const initialTimeout = config.inspect<number>('reloadTimeout')?.workspaceValue;
   const initialPort = config.inspect<number>('port')?.workspaceValue;
   const filesConfig = vscode.workspace.getConfiguration('files', file);
@@ -41,6 +42,8 @@ export async function endToEnd(): Promise<void> {
     finally { devTools = connection.current; }
   };
   try {
+    await config.update('reloadOnAutoSave', undefined, vscode.ConfigurationTarget.Workspace);
+    assert.equal(config.get<boolean>('reloadOnAutoSave'), false, 'Automatic save refresh must be disabled by default');
     await vscode.window.showTextDocument(document);
     if (process.env.FLUTTER_SDK_PATH) await config.update('flutterSdkPath', process.env.FLUTTER_SDK_PATH, vscode.ConfigurationTarget.Workspace);
     await config.update('port', testPort, vscode.ConfigurationTarget.Workspace);
@@ -84,12 +87,23 @@ export async function endToEnd(): Promise<void> {
     await rendered('Preview version 3'); checks.push('compiler failure retains page, save repairs it');
     await filesConfig.update('autoSave', 'afterDelay', vscode.ConfigurationTarget.Workspace);
     await filesConfig.update('autoSaveDelay', 300, vscode.ConfigurationTarget.Workspace);
+    const beforeAutoSave = api.getStatus();
     await replace(original.replace('Preview version 1', 'Preview version auto'), false);
-    await rendered('Preview version auto'); checks.push('Auto Save updates the rendered page without a manual save');
+    await until(() => !document.isDirty, 5000); await wait(1000);
+    assert.equal(api.getStatus().state, 'running', 'Auto Save must not start a compilation by default');
+    assert.equal(api.getStatus().lastCompilation?.operationId, beforeAutoSave.lastCompilation?.operationId);
+    assert.equal(api.getStatus().refreshCount, beforeAutoSave.refreshCount);
+    assert((await devTools!.text()).includes('Preview version 3'), 'Auto Save must retain the preview by default');
+    await vscode.window.showTextDocument(document, vscode.ViewColumn.One);
+    await vscode.commands.executeCommand('workbench.action.files.save');
+    await rendered('Preview version auto'); checks.push('Auto Save retains the page by default; explicit save updates it even after Auto Save');
+    await config.update('reloadOnAutoSave', true, vscode.ConfigurationTarget.Workspace);
+    await replace(original.replace('Preview version 1', 'Preview version auto enabled'), false);
+    await rendered('Preview version auto enabled'); checks.push('reloadOnAutoSave opt-in updates the page on Auto Save');
     await filesConfig.update('autoSave', 'off', vscode.ConfigurationTarget.Workspace);
     await config.update('reloadOnSave', false, vscode.ConfigurationTarget.Workspace);
     await replace(original.replace('Preview version 1', 'Preview version disabled')); await wait(700);
-    assert((await devTools!.text()).includes('Preview version auto'));
+    assert((await devTools!.text()).includes('Preview version auto enabled'));
     await config.update('reloadOnSave', true, vscode.ConfigurationTarget.Workspace);
     await replace(original.replace('Preview version 1', 'Preview version enabled'));
     await rendered('Preview version enabled'); checks.push('reloadOnSave changes take effect immediately');
@@ -159,6 +173,7 @@ export async function endToEnd(): Promise<void> {
     await writeFile(path.join(artifacts, 'e2e-checks.json'), JSON.stringify({ checks, status: api.getStatus(), vscode: vscode.version, sdk: process.env.FLUTTER_SDK_PATH ?? 'PATH' }, null, 2));
     await config.update('flutterSdkPath', initialSdk, vscode.ConfigurationTarget.Workspace);
     await config.update('reloadOnSave', initialReload, vscode.ConfigurationTarget.Workspace);
+    await config.update('reloadOnAutoSave', initialReloadOnAutoSave, vscode.ConfigurationTarget.Workspace);
     await config.update('reloadTimeout', initialTimeout, vscode.ConfigurationTarget.Workspace);
     await config.update('port', initialPort, vscode.ConfigurationTarget.Workspace);
     await filesConfig.update('autoSave', initialAutoSave, vscode.ConfigurationTarget.Workspace);
