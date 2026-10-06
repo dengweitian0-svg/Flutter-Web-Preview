@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Remove the obsolete `--no-web-experimental-hot-reload` launch flag so Flutter SDKs that no longer accept it can start. Use the SDK's default web compiler while retaining full-restart updates, local CanvasKit resources and browser logging.
+- Preserve the restart-oriented web compiler on Flutter SDKs that support its flag; detect when newer SDKs remove it and use their default web compiler. Keep full-restart updates, local CanvasKit resources and browser logging.
 
 ## 0.1.4
 

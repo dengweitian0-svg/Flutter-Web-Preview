@@ -20,6 +20,22 @@ export async function checkPort(port: number): Promise<void> {
     server.listen(port, '127.0.0.1', () => server.close(error => error ? reject(error) : resolve()));
   });
 }
+
+async function supportsExperimentalWebHotReloadFlag(sdkPath: string, projectRoot: string): Promise<boolean> {
+  const help = spawnFlutter(sdkPath, ['--suppress-analytics', 'run', '--help', '--verbose'], projectRoot);
+  let output = '';
+  help.stdout.setEncoding('utf8'); help.stderr.setEncoding('utf8');
+  help.stdout.on('data', chunk => { output += String(chunk); });
+  help.stderr.on('data', chunk => { output += String(chunk); });
+  help.stdin.end();
+  const code = await new Promise<number | null>((resolve, reject) => {
+    help.once('error', reject);
+    help.once('close', resolve);
+  });
+  if (code !== 0) throw new Error(`Cannot inspect Flutter run options (exit code ${code}).`);
+  return /\bweb-experimental-hot-reload\b/.test(output);
+}
+
 export class FlutterProcessRuntime implements FlutterRuntime {
   readonly events = new Signal<RuntimeEvent>();
   private session?: ProcessSession;
@@ -38,12 +54,14 @@ export class FlutterProcessRuntime implements FlutterRuntime {
       await access(path.join(spec.sdkPath, 'bin', 'flutter.bat'));
       await checkPort(spec.port);
       if (session.cancelled) return;
-      // Use the SDK's default web compiler: newer SDKs have removed the
-      // web-experimental-hot-reload flag. Updates use app.restart with
-      // fullRestart independently of the compiler's hot reload support.
+      // Preserve the restart-oriented compiler when supported. Recent SDKs
+      // removed its flag, so use their default web compiler there.
       // Serve the renderer locally and omit Dart debugger evaluation metadata;
       // application console logging uses the browser debugger independently.
       const args = ['--suppress-analytics', 'run', '--machine', '-d', 'web-server', '--no-web-resources-cdn', '--no-web-enable-expression-evaluation', '--web-hostname', '127.0.0.1', '--web-port', String(spec.port), '--target', spec.entrypoint];
+      const supportsRestartCompiler = await supportsExperimentalWebHotReloadFlag(spec.sdkPath, spec.projectRoot);
+      if (session.cancelled) return;
+      if (supportsRestartCompiler) args.splice(7, 0, '--no-web-experimental-hot-reload');
       this.log(`Starting Flutter in ${spec.projectRoot}\nflutter ${args.join(' ')}\n`);
       const child = spawnFlutter(spec.sdkPath, args, spec.projectRoot);
       session.process = child;
