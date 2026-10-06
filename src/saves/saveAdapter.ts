@@ -17,7 +17,9 @@ export class SaveAdapter {
   private disposed = false;
   constructor(private readonly host: SaveHost) {}
 
-  willSave(document: SaveDocument, reason: TextDocumentSaveReason): void { this.reasons.set(document, reason); }
+  willSave(document: SaveDocument, reason: TextDocumentSaveReason): void {
+    if (!this.saving.has(document)) this.reasons.set(document, reason);
+  }
   close(document: SaveDocument): void { this.reasons.delete(document); }
   dispose(): void { this.disposed = true; }
 
@@ -44,6 +46,7 @@ export class SaveAdapter {
         if (this.disposed || document.isClosed) return false;
         let saved = !document.isDirty;
         if (!saved) {
+          this.reasons.delete(document);
           this.saving.add(document);
           try { saved = await document.save(); }
           finally { this.saving.delete(document); }
@@ -58,7 +61,6 @@ export class SaveAdapter {
       } finally {
         if (this.operations.get(document) === operation) {
           this.operations.delete(document);
-          this.reasons.delete(document);
         }
       }
     });

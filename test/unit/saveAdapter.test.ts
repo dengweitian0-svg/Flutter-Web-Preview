@@ -140,6 +140,17 @@ describe('explicit save intent and native save events', () => {
     saved.resolve(true); await old; expect(app.request).not.toHaveBeenCalled();
   });
 
+  it('does not erase a newer native will-save reason when old validation completes', async () => {
+    const app = setup(); const lookup = deferred<boolean>(); app.belongs.mockReturnValueOnce(lookup.promise);
+    const old = app.adapter.saveAndReload(app.document);
+    await Promise.resolve(); await Promise.resolve();
+    app.setTarget({ sessionId: 'preview-2', projectRoot: 'D:/app' });
+    app.adapter.willSave(app.document, TextDocumentSaveReason.Manual);
+    lookup.resolve(true); await old;
+    await app.adapter.didSave(app.document);
+    expect(app.request).toHaveBeenCalledExactlyOnceWith({ sessionId: 'preview-2', projectRoot: 'D:/app' }, TextDocumentSaveReason.Manual);
+  });
+
   it('suppresses in-flight save participant events even with a newer queued edit', async () => {
     const app = setup(); const saved = deferred<boolean>();
     app.document.save.mockImplementationOnce(async () => {
