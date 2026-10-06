@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.1.5
 
-- Preserve the restart-oriented web compiler on Flutter SDKs that support its flag; detect when newer SDKs remove it and use their default web compiler. Keep full-restart updates, local CanvasKit resources and browser logging.
+- Detect whether the Flutter SDK supports `--no-web-experimental-hot-reload`. Keep the restart-oriented compiler on older SDKs and use the SDK default when newer releases remove the option.
+- Preserve existing Auto Save behavior on SDKs that support the old compiler flag; continue using full restarts for explicit preview updates.
+- Check the Flutter CLI options before launch to avoid startup failures when SDKs remove a flag.
 
 ## 0.1.4
 

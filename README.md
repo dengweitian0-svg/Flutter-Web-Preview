@@ -10,7 +10,7 @@ Flutter Web Preview 是面向本地 Windows 开发的 VS Code 扩展。它将 Fl
 - **应用日志可见**：自动连接预览浏览器，`print`、`debugPrint` 和 `dart:developer.log` 显示在调试控制台，包含点击和异步回调产生的输出。
 - **退出结果明确**：关闭预览或停止日志会话后，确认清理完成再输出一次 `exit`；停止失败会显示失败信息，供重试。
 
-[下载 VSIX v0.1.4](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.4/flutter-web-preview-0.1.4.vsix) · [快速开始](#快速开始) · [应用日志与退出提示](#应用日志与退出提示) · [配置](#配置) · [常见问题与支持范围](#常见问题与支持范围) · [开发与验证](#开发与验证) · [English](#english-quick-start)
+[下载 VSIX v0.1.5](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.5/flutter-web-preview-0.1.5.vsix) · [快速开始](#快速开始) · [应用日志与退出提示](#应用日志与退出提示) · [配置](#配置) · [常见问题与支持范围](#常见问题与支持范围) · [开发与验证](#开发与验证) · [English](#english-quick-start)
 
 ## 快速开始
 
@@ -31,7 +31,7 @@ flutter pub get
 
 ### 安装扩展
 
-从 [GitHub Release v0.1.4](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/tag/v0.1.4) 下载附件，或[直接下载 `flutter-web-preview-0.1.4.vsix`](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.4/flutter-web-preview-0.1.4.vsix)。
+从 [GitHub Release v0.1.5](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/tag/v0.1.5) 下载附件，或[直接下载 `flutter-web-preview-0.1.5.vsix`](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.5/flutter-web-preview-0.1.5.vsix)。
 
 在 VS Code 按 `Ctrl + Shift + P`，执行 **Extensions: Install from VSIX...（从 VSIX 安装）**，选择下载的文件，安装完成后重新加载窗口。
 
@@ -44,7 +44,7 @@ npm ci
 npm run package
 ```
 
-源码当前生成 `artifacts/flutter-web-preview-0.1.4.vsix`（保存通知缺失修复版）。Marketplace 发布准备见[发布说明](docs/marketplace.md)。
+源码当前生成 `artifacts/flutter-web-preview-0.1.5.vsix`（保存通知缺失修复版）。Marketplace 发布准备见[发布说明](docs/marketplace.md)。
 
 ### 开始预览
 
@@ -214,7 +214,7 @@ VS Code 1.140.0 由测试工具自动下载并缓存在 `.cache/vscode-test/`。
 
 Preview Flutter Web inside VS Code on **local Windows**. Use VS Code **1.140.0+** and a Flutter **3.35-series or later stable SDK**.
 
-Download the [v0.1.4 VSIX](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.4/flutter-web-preview-0.1.4.vsix) from [GitHub Releases](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/tag/v0.1.4). In VS Code, run **Extensions: Install from VSIX...**, select the downloaded file, and reload the window. When updating, stop the preview before installing the new version.
+Download the [v0.1.5 VSIX](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.5/flutter-web-preview-0.1.5.vsix) from [GitHub Releases](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/tag/v0.1.5). In VS Code, run **Extensions: Install from VSIX...**, select the downloaded file, and reload the window. When updating, stop the preview before installing the new version.
 
 Open a trusted Flutter Web project and run `flutter pub get`. Click **Run Web Preview** above the top-level `main()`, then press **Ctrl+S** in a local Dart editor to run **Save and Reload Web Preview**. The command saves and requests one update even without a will-save notification, or when the file is already saved. VS Code Auto Save does not refresh the preview by default; enable `flutterWebPreview.reloadOnAutoSave` to opt in. `reloadOnSave` remains the master switch. Native Save / Save All with no save reason still cannot be identified as manual and are filtered by default; the existing Auto Save opt-in also accepts unknown save sources. Close the preview tab to stop its Flutter server.
 
