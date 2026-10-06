@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- Refresh the preview on manual Dart saves by default. Add `flutterWebPreview.reloadOnAutoSave` (default `false`) to opt into refreshes triggered by VS Code Auto Save, while retaining `reloadOnSave` as the master switch.
+
 ## 0.1.2
 
 - Serve CanvasKit locally and use the restart-oriented web compiler without Dart expression evaluation metadata to reduce startup and page refresh overhead.

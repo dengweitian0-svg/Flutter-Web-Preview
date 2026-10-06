@@ -4,13 +4,13 @@
 
 Flutter Web Preview 是面向本地 Windows 开发的 VS Code 扩展。它将 Flutter 应用打开在编辑器内置的 Integrated Browser 中，让你在修改 Dart 界面时直接查看结果，无需切换到外部 Chrome。
 
-- **保存即更新**：支持手动保存和 Auto Save；连续保存会合并更新请求，编译完成后刷新页面。
+- **手动保存更新**：默认仅在主动保存 Dart 文件后更新预览；VS Code Auto Save 不触发更新。连续保存会合并更新请求，编译完成后刷新页面。
 - **预览管理服务**：首次手动启动，关闭预览标签后停止对应 Flutter 服务并释放端口；之后保存文件不会重新启动。
 - **编译失败可恢复**：保留上一次成功的页面，修复错误并保存后继续更新；状态栏和 Output 提供运行状态与日志。
 - **应用日志可见**：自动连接预览浏览器，`print`、`debugPrint` 和 `dart:developer.log` 显示在调试控制台，包含点击和异步回调产生的输出。
 - **退出结果明确**：关闭预览或停止日志会话后，确认清理完成再输出一次 `exit`；停止失败会显示失败信息，供重试。
 
-[下载 VSIX v0.1.2](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.2/flutter-web-preview-0.1.2.vsix) · [快速开始](#快速开始) · [应用日志与退出提示](#应用日志与退出提示) · [配置](#配置) · [常见问题与支持范围](#常见问题与支持范围) · [开发与验证](#开发与验证) · [English](#english-quick-start)
+[下载 VSIX v0.1.3](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.3/flutter-web-preview-0.1.3.vsix) · [快速开始](#快速开始) · [应用日志与退出提示](#应用日志与退出提示) · [配置](#配置) · [常见问题与支持范围](#常见问题与支持范围) · [开发与验证](#开发与验证) · [English](#english-quick-start)
 
 ## 快速开始
 
@@ -31,7 +31,7 @@ flutter pub get
 
 ### 安装扩展
 
-从 [GitHub Release v0.1.2](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/tag/v0.1.2) 下载附件，或[直接下载 `flutter-web-preview-0.1.2.vsix`](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.2/flutter-web-preview-0.1.2.vsix)。
+从 [GitHub Release v0.1.3](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/tag/v0.1.3) 下载附件，或[直接下载 `flutter-web-preview-0.1.3.vsix`](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.3/flutter-web-preview-0.1.3.vsix)。
 
 在 VS Code 按 `Ctrl + Shift + P`，执行 **Extensions: Install from VSIX...（从 VSIX 安装）**，选择下载的文件，安装完成后重新加载窗口。
 
@@ -44,13 +44,13 @@ npm ci
 npm run package
 ```
 
-源码当前生成 `artifacts/flutter-web-preview-0.1.2.vsix`（性能修复版）。Marketplace 发布准备见[发布说明](docs/marketplace.md)。
+源码当前生成 `artifacts/flutter-web-preview-0.1.3.vsix`（手动保存更新版）。Marketplace 发布准备见[发布说明](docs/marketplace.md)。
 
 ### 开始预览
 
 1. 在 VS Code 中打开并信任你的 Flutter Web 项目。
 2. 打开入口 Dart 文件，点击顶层 `main()` 上方的 **Run Web Preview**；也可在命令面板执行 **Flutter Web Preview: Run Web Preview**。
-3. 修改并保存当前项目中的 Dart 文件，右侧预览在编译成功后自动刷新。
+3. 修改当前项目中的 Dart 文件，按 `Ctrl + S` 主动保存，右侧预览在编译成功后自动刷新。默认不会因 VS Code Auto Save 刷新预览。
 4. 关闭预览标签结束会话，再次点击 **Run Web Preview** 可重新启动。
 
 多根工作区支持选择项目，每个 VS Code 窗口同时运行一个预览。保存其他项目的文件不会更新当前预览。
@@ -132,13 +132,16 @@ SDK 查找顺序为 `flutterWebPreview.flutterSdkPath`、`dart.flutterSdkPath`�
 | `flutterSdkPath` | `""` | Flutter SDK 根目录，留空则继续查找 |
 | `entrypoint` | `"lib/main.dart"` | 相对于 Flutter 项目根目录的默认入口 |
 | `port` | `7357` | 本地服务端口，范围为 1024–65535 |
-| `reloadOnSave` | `true` | 保存 Dart 文件时自动更新 |
+| `reloadOnSave` | `true` | 保存 Dart 文件后更新预览的总开关；默认响应手动保存 |
+| `reloadOnAutoSave` | `false` | 是否也响应 VS Code 自动保存（延时、失焦）；需同时开启 reloadOnSave |
 | `reloadDelay` | `300` | 保存防抖等待时间，单位毫秒 |
 | `startupTimeout` | `180000` | 启动超时，单位毫秒 |
 | `reloadTimeout` | `30000` | 重新编译超时，单位毫秒 |
 | `showCodeLens` | `true` | 在顶层 `main()` 上方显示运行入口 |
 
 SDK、端口、默认入口和启动超时在下次启动或 **Restart Web Preview** 时生效；其他配置即时生效或在下一次对应操作时读取。通过 CodeLens 启动的文件，或活动编辑器中包含顶层 `main()` 的文件，优先于默认入口配置。
+
+默认保留 VS Code 的文件保存设置，插件只控制保存后是否刷新预览。若需要恢复自动保存后刷新，可在设置中开启 **Flutter Web Preview: Reload On Auto Save**，或配置 `"flutterWebPreview.reloadOnAutoSave": true`。**Reload Web Preview** 始终可以手动重新编译并刷新。
 
 ## 常见问题与支持范围
 
@@ -207,9 +210,9 @@ VS Code 1.140.0 由测试工具自动下载并缓存在 `.cache/vscode-test/`。
 
 Preview Flutter Web inside VS Code on **local Windows**. Use VS Code **1.140.0+** and a Flutter **3.35-series or later stable SDK**.
 
-Download the [v0.1.2 VSIX](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.2/flutter-web-preview-0.1.2.vsix) from [GitHub Releases](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/tag/v0.1.2). In VS Code, run **Extensions: Install from VSIX...**, select the downloaded file, and reload the window. When updating, stop the preview before installing the new version.
+Download the [v0.1.3 VSIX](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.3/flutter-web-preview-0.1.3.vsix) from [GitHub Releases](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/tag/v0.1.3). In VS Code, run **Extensions: Install from VSIX...**, select the downloaded file, and reload the window. When updating, stop the preview before installing the new version.
 
-Open a trusted Flutter Web project and run `flutter pub get`. Click **Run Web Preview** above the top-level `main()`, then save Dart files to recompile and refresh automatically. Close the preview tab to stop its Flutter server.
+Open a trusted Flutter Web project and run `flutter pub get`. Click **Run Web Preview** above the top-level `main()`, then press **Ctrl+S** to save Dart files, recompile and refresh. VS Code Auto Save does not refresh the preview by default; enable `flutterWebPreview.reloadOnAutoSave` to opt in. `reloadOnSave` remains the master switch. Close the preview tab to stop its Flutter server.
 
 Application logs appear automatically in the **Flutter Web Preview (preview-…)** Debug Console session, including `print`, `debugPrint`, and `dart:developer.log` from clicks and asynchronous callbacks. Use **Show Debug Console** to reopen it; expand developer log objects for metadata. Build and process diagnostics remain in the **Flutter Web Preview** Output channel.
 

@@ -101,13 +101,19 @@ export function activate(context: vscode.ExtensionContext): PreviewApi {
     ]);
     if (action) await vscode.commands.executeCommand(`flutterWebPreview.${action.command}`);
   });
+  const saveReasons = new WeakMap<vscode.TextDocument, vscode.TextDocumentSaveReason>();
+  context.subscriptions.push(vscode.workspace.onWillSaveTextDocument(event => {
+    saveReasons.set(event.document, event.reason);
+  }));
   context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(document => {
+    const reason = saveReasons.get(document);
+    saveReasons.delete(document);
     const current = session.current; const spec = current.context.currentSpec; const id = sessionId(current.state);
     if (!id || !spec || document.uri.scheme !== 'file' || !document.fileName.toLowerCase().endsWith('.dart')) return;
     void belongsToProject(document.uri.fsPath, spec.projectRoot).then(belongs => {
       if (!belongs || sessionId(session.current.state) !== id) return;
       const config = vscode.workspace.getConfiguration('flutterWebPreview', vscode.Uri.file(spec.projectRoot));
-      if (config.get<boolean>('reloadOnSave', true)) {
+      if (config.get<boolean>('reloadOnSave', true) && (reason === vscode.TextDocumentSaveReason.Manual || config.get<boolean>('reloadOnAutoSave', false))) {
         try { session.save(numericSetting(config, 'reloadDelay', 300, 0, 60000)); } catch (error) { report(String(error)); }
       }
     }).catch(error => report(String(error)));
