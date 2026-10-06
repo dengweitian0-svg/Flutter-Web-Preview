@@ -8,6 +8,7 @@ import { FlutterProcessRuntime } from './flutter/flutterRuntime';
 import { belongsToProject, nearestProject } from './project/flutterProject';
 import { numericSetting, resolveLaunch } from './project/resolveLaunch';
 import { mainOffsets } from './ui/dartMain';
+import { SaveAdapter } from './saves/saveAdapter';
 
 export interface PreviewStatus { state: SessionState['kind']; sessionId?: string; projectRoot?: string; url?: string; error?: string; browserAvailable: boolean; logConsoleConnected: boolean; lastRefreshLatencyMs?: number; lastCompilation?: SessionContext['lastCompilation']; refreshCount: number }
 export interface PreviewApi { getStatus(): PreviewStatus }
@@ -96,28 +97,41 @@ export function activate(context: vscode.ExtensionContext): PreviewApi {
     const action = await vscode.window.showQuickPick([
       { label: 'Run Web Preview', command: 'run' }, { label: 'Stop Web Preview', command: 'stop' },
       { label: 'Restart Web Preview', command: 'restart' }, { label: 'Reload Web Preview', command: 'reload' },
+      { label: 'Save and Reload Web Preview', command: 'saveAndReload' },
       { label: 'Open Preview Browser', command: 'openBrowser' }, { label: 'Reload Preview Browser', command: 'reloadBrowser' },
       { label: 'Show Debug Console', command: 'showDebugConsole' }, { label: 'Show Output', command: 'showOutput' },
     ]);
     if (action) await vscode.commands.executeCommand(`flutterWebPreview.${action.command}`);
   });
-  const saveReasons = new WeakMap<vscode.TextDocument, vscode.TextDocumentSaveReason>();
+  const saves = new SaveAdapter({
+    target: () => {
+      const { state, context: current } = session.current;
+      const id = sessionId(state);
+      return id && current.currentSpec && ['starting', 'running', 'updating'].includes(state.kind)
+        ? { sessionId: id, projectRoot: current.currentSpec.projectRoot } : undefined;
+    },
+    isCurrent: target => sessionId(session.current.state) === target.sessionId && ['starting', 'running', 'updating'].includes(session.current.state.kind),
+    belongs: (document, target) => belongsToProject(document.uri.fsPath, target.projectRoot),
+    request: (target, reason) => {
+      const config = vscode.workspace.getConfiguration('flutterWebPreview', vscode.Uri.file(target.projectRoot));
+      if (config.get<boolean>('reloadOnSave', true) && (reason === vscode.TextDocumentSaveReason.Manual || config.get<boolean>('reloadOnAutoSave', false))) {
+        session.save(numericSetting(config, 'reloadDelay', 300, 0, 60000));
+      }
+    },
+  });
+  context.subscriptions.push(saves);
+  register('saveAndReload', () => {
+    const document = vscode.window.activeTextEditor?.document;
+    if (!document) return vscode.commands.executeCommand('workbench.action.files.save');
+    return saves.saveAndReload(document);
+  });
   context.subscriptions.push(vscode.workspace.onWillSaveTextDocument(event => {
-    saveReasons.set(event.document, event.reason);
+    saves.willSave(event.document, event.reason);
   }));
   context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(document => {
-    const reason = saveReasons.get(document);
-    saveReasons.delete(document);
-    const current = session.current; const spec = current.context.currentSpec; const id = sessionId(current.state);
-    if (!id || !spec || document.uri.scheme !== 'file' || !document.fileName.toLowerCase().endsWith('.dart')) return;
-    void belongsToProject(document.uri.fsPath, spec.projectRoot).then(belongs => {
-      if (!belongs || sessionId(session.current.state) !== id) return;
-      const config = vscode.workspace.getConfiguration('flutterWebPreview', vscode.Uri.file(spec.projectRoot));
-      if (config.get<boolean>('reloadOnSave', true) && (reason === vscode.TextDocumentSaveReason.Manual || config.get<boolean>('reloadOnAutoSave', false))) {
-        try { session.save(numericSetting(config, 'reloadDelay', 300, 0, 60000)); } catch (error) { report(String(error)); }
-      }
-    }).catch(error => report(String(error)));
+    void saves.didSave(document).catch(error => report(String(error)));
   }));
+  context.subscriptions.push(vscode.workspace.onDidCloseTextDocument(document => saves.close(document)));
   const lensChanges = new vscode.EventEmitter<void>();
   context.subscriptions.push(lensChanges, vscode.languages.registerCodeLensProvider([{ scheme: 'file', language: 'dart' }, { scheme: 'file', pattern: '**/*.dart' }], {
     onDidChangeCodeLenses: lensChanges.event,

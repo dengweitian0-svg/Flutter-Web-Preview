@@ -4,13 +4,13 @@
 
 Flutter Web Preview 是面向本地 Windows 开发的 VS Code 扩展。它将 Flutter 应用打开在编辑器内置的 Integrated Browser 中，让你在修改 Dart 界面时直接查看结果，无需切换到外部 Chrome。
 
-- **手动保存更新**：默认仅在主动保存 Dart 文件后更新预览；VS Code Auto Save 不触发更新。连续保存会合并更新请求，编译完成后刷新页面。
+- **手动保存更新**：活动预览中的本地 Dart 编辑器使用 Ctrl+S 调用 **Save and Reload Web Preview**，保存成功后更新预览，即使保存前通知缺失也可更新；VS Code Auto Save 默认不触发更新。连续保存会合并更新请求，编译完成后刷新页面。
 - **预览管理服务**：首次手动启动，关闭预览标签后停止对应 Flutter 服务并释放端口；之后保存文件不会重新启动。
 - **编译失败可恢复**：保留上一次成功的页面，修复错误并保存后继续更新；状态栏和 Output 提供运行状态与日志。
 - **应用日志可见**：自动连接预览浏览器，`print`、`debugPrint` 和 `dart:developer.log` 显示在调试控制台，包含点击和异步回调产生的输出。
 - **退出结果明确**：关闭预览或停止日志会话后，确认清理完成再输出一次 `exit`；停止失败会显示失败信息，供重试。
 
-[下载 VSIX v0.1.3](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.3/flutter-web-preview-0.1.3.vsix) · [快速开始](#快速开始) · [应用日志与退出提示](#应用日志与退出提示) · [配置](#配置) · [常见问题与支持范围](#常见问题与支持范围) · [开发与验证](#开发与验证) · [English](#english-quick-start)
+[下载 VSIX v0.1.4](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.4/flutter-web-preview-0.1.4.vsix) · [快速开始](#快速开始) · [应用日志与退出提示](#应用日志与退出提示) · [配置](#配置) · [常见问题与支持范围](#常见问题与支持范围) · [开发与验证](#开发与验证) · [English](#english-quick-start)
 
 ## 快速开始
 
@@ -31,7 +31,7 @@ flutter pub get
 
 ### 安装扩展
 
-从 [GitHub Release v0.1.3](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/tag/v0.1.3) 下载附件，或[直接下载 `flutter-web-preview-0.1.3.vsix`](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.3/flutter-web-preview-0.1.3.vsix)。
+从 [GitHub Release v0.1.4](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/tag/v0.1.4) 下载附件，或[直接下载 `flutter-web-preview-0.1.4.vsix`](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.4/flutter-web-preview-0.1.4.vsix)。
 
 在 VS Code 按 `Ctrl + Shift + P`，执行 **Extensions: Install from VSIX...（从 VSIX 安装）**，选择下载的文件，安装完成后重新加载窗口。
 
@@ -44,7 +44,7 @@ npm ci
 npm run package
 ```
 
-源码当前生成 `artifacts/flutter-web-preview-0.1.3.vsix`（手动保存更新版）。Marketplace 发布准备见[发布说明](docs/marketplace.md)。
+源码当前生成 `artifacts/flutter-web-preview-0.1.4.vsix`（保存通知缺失修复版）。Marketplace 发布准备见[发布说明](docs/marketplace.md)。
 
 ### 开始预览
 
@@ -106,6 +106,7 @@ npm run package
 | Stop Web Preview | 停止 Flutter 服务并清理会话 |
 | Restart Web Preview | 重新读取启动配置并重启 |
 | Reload Web Preview | 手动重新编译并刷新页面 |
+| Save and Reload Web Preview | 保存当前文档并请求更新；已保存的文件也可更新，遵守 reloadOnSave 总开关 |
 | Open Preview Browser | 打开预览，或显式重新绑定预览标签 |
 | Reload Preview Browser | 仅刷新浏览器页面，不重新编译 |
 | Show Output | 查看 Flutter 运行、编译及扩展日志 |
@@ -142,6 +143,8 @@ SDK 查找顺序为 `flutterWebPreview.flutterSdkPath`、`dart.flutterSdkPath`�
 SDK、端口、默认入口和启动超时在下次启动或 **Restart Web Preview** 时生效；其他配置即时生效或在下一次对应操作时读取。通过 CodeLens 启动的文件，或活动编辑器中包含顶层 `main()` 的文件，优先于默认入口配置。
 
 默认保留 VS Code 的文件保存设置，插件只控制保存后是否刷新预览。若需要恢复自动保存后刷新，可在设置中开启 **Flutter Web Preview: Reload On Auto Save**，或配置 `"flutterWebPreview.reloadOnAutoSave": true`。**Reload Web Preview** 始终可以手动重新编译并刷新。
+
+**Save and Reload Web Preview** 可从命令面板或状态栏调用；它固定当前文档和预览会话，保存失败或取消时不更新。Ctrl+S（macOS 为 Cmd+S）仅在活动预览、本地 Dart 编辑器有焦点时绑定该命令，其他项目的文件只保存而不更新当前预览。原生 File > Save / Save All 或其他扩展发起的保存，如果 VS Code 未提供保存前原因，默认仍不刷新；公开保存完成事件无法准确判断来源。已有 `reloadOnAutoSave=true` 也接受来源未知的保存。详见[保存通知修复说明](docs/save-notifications.md)。
 
 ## 常见问题与支持范围
 
@@ -210,9 +213,9 @@ VS Code 1.140.0 由测试工具自动下载并缓存在 `.cache/vscode-test/`。
 
 Preview Flutter Web inside VS Code on **local Windows**. Use VS Code **1.140.0+** and a Flutter **3.35-series or later stable SDK**.
 
-Download the [v0.1.3 VSIX](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.3/flutter-web-preview-0.1.3.vsix) from [GitHub Releases](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/tag/v0.1.3). In VS Code, run **Extensions: Install from VSIX...**, select the downloaded file, and reload the window. When updating, stop the preview before installing the new version.
+Download the [v0.1.4 VSIX](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/download/v0.1.4/flutter-web-preview-0.1.4.vsix) from [GitHub Releases](https://github.com/dengweitian0-svg/Flutter-Web-Preview/releases/tag/v0.1.4). In VS Code, run **Extensions: Install from VSIX...**, select the downloaded file, and reload the window. When updating, stop the preview before installing the new version.
 
-Open a trusted Flutter Web project and run `flutter pub get`. Click **Run Web Preview** above the top-level `main()`, then press **Ctrl+S** to save Dart files, recompile and refresh. VS Code Auto Save does not refresh the preview by default; enable `flutterWebPreview.reloadOnAutoSave` to opt in. `reloadOnSave` remains the master switch. Close the preview tab to stop its Flutter server.
+Open a trusted Flutter Web project and run `flutter pub get`. Click **Run Web Preview** above the top-level `main()`, then press **Ctrl+S** in a local Dart editor to run **Save and Reload Web Preview**. The command saves and requests one update even without a will-save notification, or when the file is already saved. VS Code Auto Save does not refresh the preview by default; enable `flutterWebPreview.reloadOnAutoSave` to opt in. `reloadOnSave` remains the master switch. Native Save / Save All with no save reason still cannot be identified as manual and are filtered by default; the existing Auto Save opt-in also accepts unknown save sources. Close the preview tab to stop its Flutter server.
 
 Application logs appear automatically in the **Flutter Web Preview (preview-…)** Debug Console session, including `print`, `debugPrint`, and `dart:developer.log` from clicks and asynchronous callbacks. Use **Show Debug Console** to reopen it; expand developer log objects for metadata. Build and process diagnostics remain in the **Flutter Web Preview** Output channel.
 
