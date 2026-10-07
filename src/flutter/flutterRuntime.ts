@@ -54,11 +54,11 @@ export class FlutterProcessRuntime implements FlutterRuntime {
       await access(path.join(spec.sdkPath, 'bin', 'flutter.bat'));
       await checkPort(spec.port);
       if (session.cancelled) return;
-      // Preserve the restart-oriented compiler when supported. Recent SDKs
-      // removed its flag, so use their default web compiler there.
+      // Keep Flutter's own hot reload disabled so file changes cannot bypass
+      // reloadOnAutoSave. Updates are requested explicitly through full restart.
       // Serve the renderer locally and omit Dart debugger evaluation metadata;
       // application console logging uses the browser debugger independently.
-      const args = ['--suppress-analytics', 'run', '--machine', '-d', 'web-server', '--no-web-resources-cdn', '--no-web-enable-expression-evaluation', '--web-hostname', '127.0.0.1', '--web-port', String(spec.port), '--target', spec.entrypoint];
+      const args = ['--suppress-analytics', 'run', '--machine', '--no-hot', '-d', 'web-server', '--no-web-resources-cdn', '--no-web-enable-expression-evaluation', '--web-hostname', '127.0.0.1', '--web-port', String(spec.port), '--target', spec.entrypoint];
       const supportsRestartCompiler = await supportsExperimentalWebHotReloadFlag(spec.sdkPath, spec.projectRoot);
       if (session.cancelled) return;
       if (supportsRestartCompiler) args.splice(7, 0, '--no-web-experimental-hot-reload');

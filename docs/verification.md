@@ -11,6 +11,7 @@
 - GitHub Actions run `37474092801` 在检出 Flutter 源码时，因 `engine/...golden...png` 完整路径超过 Git for Windows 的默认限制而失败（`Filename too long`）。
 - 为该检出命令启用 `core.longpaths`，并将 SDK 目录缩短为 `.cache/f`。修复尚未由后续云端 CI 验证。
 - 后续 run `37575146694` 检出成功，但浅克隆缺少 Flutter 版本计算所需的 Git tags/history，SDK 将自身报告为 `0.0.0-unknown`。检出深度提升至 300 并包含 tags，启动步骤同时断言版本及 revision 与本机一致。
+- Run `37575791196` 通过 checkout、版本校验和 fixture 准备后，在 Auto Save 行为断言失败。Flutter 3.49 默认启用 Web hot reload，绕过了扩展的 Auto Save 设置；启动参数加入 `--no-hot`，由 machine protocol 的显式完整重启处理更新。此修复尚未经过后续 CI 验证。
 
 ## CI 失败判据与浏览器等待修正（2026-10-05）
 
