@@ -73,6 +73,16 @@ describe('CDP page verification', () => {
     await expect(waitForText({}, 'http://localhost/', 'Version', 1000)).rejects.toThrow('Broken expression');
     expect(connect).toHaveBeenCalledOnce();
   });
+  it('keeps a live target connection across restarts and requires the new document', async () => {
+    const client = { documentId: vi.fn().mockResolvedValueOnce('old').mockResolvedValue('new'), evaluate: vi.fn(async () => 'complete'), text: vi.fn(async () => 'Emit preview logs'), close: vi.fn() };
+    const discovery = vi.spyOn(DevTools, 'connect').mockRejectedValue(new TransientCdpError('Discovery is unavailable'));
+    const connection = { current: client as unknown as DevTools };
+    await waitForText(connection, 'http://localhost/', 'Emit preview logs', 2000, 'old');
+    expect(client.documentId).toHaveBeenCalledTimes(2);
+    expect(client.text).toHaveBeenCalledOnce();
+    expect(discovery).not.toHaveBeenCalled(); expect(client.close).not.toHaveBeenCalled();
+    expect(connection.current).toBe(client);
+  });
   it('fails at its total deadline when the document never becomes ready', async () => {
     const client = { documentId: vi.fn(async () => 'new'), evaluate: vi.fn(async () => 'loading') };
     vi.spyOn(DevTools, 'connect').mockResolvedValue(client as unknown as DevTools);

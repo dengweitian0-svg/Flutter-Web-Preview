@@ -66,6 +66,7 @@ export async function logConsoleTest(): Promise<void> {
   });
   let preview: DevTools | undefined; let workbench: DevTools | undefined;
   let readySession: string | undefined; let readyDocument: string | undefined; let readyRefreshes = 0;
+  let phase = 'startup'; let readyAttempt: unknown;
   let unrelated: vscode.DebugSession | undefined;
   const command = (name: string, ...args: unknown[]) => vscode.commands.executeCommand(`flutterWebPreview.${name}`, ...args);
   const server = createServer((_request, response) => { response.end('<title>Unrelated browser</title>Unrelated'); });
@@ -76,18 +77,24 @@ export async function logConsoleTest(): Promise<void> {
     const edit = new vscode.WorkspaceEdit(); edit.replace(file, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)), text);
     assert(await vscode.workspace.applyEdit(edit)); assert(await document.save());
   };
-  const ready = async () => {
+  const ready = async (nextPhase = phase) => {
+    phase = nextPhase;
+    console.log(`LOG CONSOLE START: ${phase}`);
     await until(() => api.getStatus().state === 'failed' || api.getStatus().error?.includes('Cannot connect preview logs') || (api.getStatus().state === 'running' && api.getStatus().logConsoleConnected));
     assert.equal(api.getStatus().state, 'running', api.getStatus().error);
     assert.equal(api.getStatus().error, undefined);
     const status = api.getStatus();
     const previousDocument = status.sessionId !== readySession || status.refreshCount !== readyRefreshes ? readyDocument : undefined;
-    preview?.close();
-    const connection: { current?: DevTools } = {};
+    // A stopped/restarted Flutter process can reuse the same browser target.
+    // Keep its live CDP connection; waitForText reconnects if the target closes.
+    const connection = { current: preview };
+    readyAttempt = { phase, status, previousDocument, preview: preview?.diagnostics() };
+    console.log(`LOG CONSOLE WAIT: ${phase}; session=${status.sessionId}; refreshes=${status.refreshCount}`);
     try {
       // Reused tabs may still display the previous application's DOM during startup.
       await waitForText(connection, status.url!, 'Emit preview logs', 60000, previousDocument);
       readyDocument = await connection.current!.documentId(); readySession = status.sessionId; readyRefreshes = status.refreshCount;
+      console.log(`LOG CONSOLE READY: ${phase}; session=${readySession}`);
     }
     finally { preview = connection.current; }
   };
@@ -129,7 +136,7 @@ export async function logConsoleTest(): Promise<void> {
     await config.update('port', testPort, vscode.ConfigurationTarget.Workspace);
     await vscode.window.showTextDocument(document, vscode.ViewColumn.One);
     if (process.env.FLUTTER_SDK_PATH) await config.update('flutterSdkPath', process.env.FLUTTER_SDK_PATH, vscode.ConfigurationTarget.Workspace);
-    await command('run', file); await ready();
+    await command('run', file); await ready('initial preview');
     await until(() => vscode.window.activeTextEditor?.document.uri.toString() === file.toString(), 5000);
     assert.equal(vscode.window.activeTextEditor?.document.uri.toString(), file.toString(), 'Initial log attachment must preserve editor focus');
     workbench = await DevTools.connect('vscode-file://');
@@ -151,14 +158,14 @@ export async function logConsoleTest(): Promise<void> {
     await until(async () => String(await workbench!.evaluate(`document.querySelector('.repl')?.innerText`)).includes(`exit: ${initialConsole.configuration.flutterWebPreviewConsoleSessionId}`), 10000);
     await workbench!.screenshot(path.join(artifacts, 'debug-console-exit.png'));
     checks.push('Closing the sole preview leaves a visible, exactly-once confirmed exit in its original console');
-    await vscode.window.showTextDocument(document); await command('run', file); await ready();
+    await vscode.window.showTextDocument(document); await command('run', file); await ready('run after browser close');
 
     const ownerToken = () => [...sessions.values()].filter(session => !session.parentSession && session.configuration.flutterWebPreviewLogToken).at(-1)!.configuration.flutterWebPreviewLogToken;
     const token = ownerToken();
-    await command('run', file); await command('openBrowser'); await wait(500); await ready();
+    await command('run', file); await command('openBrowser'); await wait(500); await ready('repeated run/open');
     assert.equal(ownerToken(), token, 'Repeated Run/Open must reuse logging session');
     await emitAndCheck();
-    await command('reloadBrowser'); await wait(500); await ready(); await emitAndCheck();
+    await command('reloadBrowser'); await wait(500); await ready('browser reload'); await emitAndCheck();
     assert.equal(ownerToken(), token, 'Browser reload must reuse logging session');
     await vscode.window.showTextDocument(document);
     const beforeSave = api.getStatus();
@@ -169,7 +176,7 @@ export async function logConsoleTest(): Promise<void> {
     const savedConnection = { current: preview };
     try { await waitForText(savedConnection, api.getStatus().url!, 'Preview logs saved', 60000, beforeSaveDocument); }
     finally { preview = savedConnection.current; }
-    await wait(500); await ready();
+    await wait(500); await ready('Dart save');
     assert.equal(vscode.window.activeTextEditor?.document.uri.toString(), file.toString(), 'Save refresh must preserve editor focus');
     await emitAndCheck(); assert.equal(ownerToken(), token);
     const beforeRestart = ownedConsole();
@@ -177,7 +184,7 @@ export async function logConsoleTest(): Promise<void> {
     checks.push('Repeated Run/Open, browser reload, and Dart save keep a single logging session and editor focus');
 
     await command('restart'); await until(() => api.getStatus().state === 'stopping' || !api.getStatus().logConsoleConnected, 10000);
-    await ready(); assert.notEqual(ownerToken(), token); await emitAndCheck();
+    await ready('restart'); assert.notEqual(ownerToken(), token); await emitAndCheck();
     await checkExit(beforeRestart); assert.equal(exits(ownedConsole()).length, 0, 'A new preview must not inherit the old exit');
     checks.push('Restart establishes a fresh logging session and captures application logs');
 
@@ -200,7 +207,7 @@ export async function logConsoleTest(): Promise<void> {
     await until(() => records.some(record => rootSession(record.session).id === unrelated!.id && record.body.output?.includes('Unrelated debugger remains connected')), 5000);
     checks.push('Other browser and active debug session remain isolated; Stop releases Flutter port');
 
-    await command('run', file); await ready();
+    await command('run', file); await ready('run after isolated stop');
     const beforeToolbarStop = ownedConsole();
     await selectConsole(beforeToolbarStop);
     await until(() => !!vscode.debug.activeDebugSession && !!rootSession(vscode.debug.activeDebugSession).configuration.flutterWebPreviewLogToken, 5000);
@@ -208,7 +215,7 @@ export async function logConsoleTest(): Promise<void> {
     await until(() => api.getStatus().state === 'stopped', 15000); await checkPort(testPort);
     await checkExit(beforeToolbarStop);
     checks.push('Stopping the owned logging session stops the preview and releases the port');
-    await command('run', file); await ready();
+    await command('run', file); await ready('run after toolbar stop');
     const beforeClose = ownedConsole();
     await vscode.commands.executeCommand('workbench.action.browser.open', { reuseUrlFilter: `${new URL(api.getStatus().url!).origin}/**` });
     const tab = vscode.window.tabGroups.activeTabGroup.activeTab; assert(tab); await vscode.window.tabGroups.close(tab);
@@ -222,7 +229,7 @@ export async function logConsoleTest(): Promise<void> {
     checks.push('Closing preview cleans up log session and Flutter');
     console.log(`LOG CONSOLE PASSED: ${checks.join('; ')}`);
   } catch (error) {
-    const failure = { error: error instanceof Error ? error.stack : String(error), checks: [...checks], status: api.getStatus(), readySession, readyDocument, readyRefreshes, preview: preview?.diagnostics(), workbench: workbench?.diagnostics(), sessions: [...sessions.values()].map(session => ({ id: session.id, parent: session.parentSession?.id, configuration: session.configuration, ended: terminated.has(session.id) })), output: records.map(record => ({ session: record.session.id, body: record.body })) };
+    const failure = { error: error instanceof Error ? error.stack : String(error), phase, readyAttempt, checks: [...checks], status: api.getStatus(), readySession, readyDocument, readyRefreshes, preview: preview?.diagnostics(), workbench: workbench?.diagnostics(), sessions: [...sessions.values()].map(session => ({ id: session.id, parent: session.parentSession?.id, configuration: session.configuration, ended: terminated.has(session.id) })), output: records.map(record => ({ session: record.session.id, body: record.body })) };
     await writeFile(path.join(artifacts, 'log-console-failure.json'), JSON.stringify(failure, null, 2));
     const page = await preview?.evaluate(`[...document.querySelectorAll('[role="button"],button')].map(node => ({ html: node.outerHTML, rect: node.getBoundingClientRect().toJSON() }))`).catch(() => undefined);
     await writeFile(path.join(artifacts, 'log-console-failure.json'), JSON.stringify({ ...failure, page }, null, 2));

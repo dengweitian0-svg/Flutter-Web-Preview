@@ -14,7 +14,9 @@ const options = {
   cachePath: resolve('.cache/vscode-test'),
   extensionDevelopmentPath: process.env.PREVIEW_INSTALLED_TEST === '1' ? resolve(`.cache/vsix-extensions/${manifest.publisher}.${manifest.name}-${manifest.version}`) : process.cwd(),
   extensionTestsPath: resolve('dist/test/extension/index.js'),
-  launchArgs: [resolve('test/fixtures/flutter_app'), '--disable-extensions', '--skip-welcome', '--skip-release-notes', '--disable-workspace-trust', `--remote-debugging-port=${cdpPort}`, '--remote-debugging-address=127.0.0.1', '--user-data-dir', resolve(`.cache/vscode-user-${runId}`), '--extensions-dir', resolve('.cache/vscode-extensions')],
+  // The scenario switches browser tabs and debug sessions repeatedly. Keep
+  // occluded test renderers scheduled so page loading and layout frames continue.
+  launchArgs: [resolve('test/fixtures/flutter_app'), '--disable-extensions', '--skip-welcome', '--skip-release-notes', '--disable-workspace-trust', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', `--remote-debugging-port=${cdpPort}`, '--remote-debugging-address=127.0.0.1', '--user-data-dir', resolve(`.cache/vscode-user-${runId}`), '--extensions-dir', resolve('.cache/vscode-extensions')],
   extensionTestsEnv: { PREVIEW_TEST_MODE: process.env.PREVIEW_TEST_MODE || 'probe', PREVIEW_SHUTDOWN_MARKER: shutdownMarker, PREVIEW_RUN_ID: runId, PREVIEW_ARTIFACTS_DIR: process.env.PREVIEW_ARTIFACTS_DIR || resolve('artifacts') },
 };
 try { await runTests(options); }

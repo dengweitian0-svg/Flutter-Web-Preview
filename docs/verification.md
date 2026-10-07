@@ -9,9 +9,16 @@
 ## Windows Flutter SDK 检出路径修正（2026-10-07）
 
 - GitHub Actions run `37474092801` 在检出 Flutter 源码时，因 `engine/...golden...png` 完整路径超过 Git for Windows 的默认限制而失败（`Filename too long`）。
-- 为该检出命令启用 `core.longpaths`，并将 SDK 目录缩短为 `.cache/f`。修复尚未由后续云端 CI 验证。
+- 为该检出命令启用 `core.longpaths`，并将 SDK 目录缩短为 `.cache/f`；后续 run `37575146694` 已通过检出。
 - 后续 run `37575146694` 检出成功，但浅克隆缺少 Flutter 版本计算所需的 Git tags/history，SDK 将自身报告为 `0.0.0-unknown`。检出深度提升至 300 并包含 tags，启动步骤同时断言版本及 revision 与本机一致。
-- Run `37575791196` 通过 checkout、版本校验和 fixture 准备后，在 Auto Save 行为断言失败。Flutter 3.49 默认启用 Web hot reload，绕过了扩展的 Auto Save 设置；启动参数加入 `--no-hot`，由 machine protocol 的显式完整重启处理更新。此修复尚未经过后续 CI 验证。
+- Run `37575791196` 通过 checkout、版本校验和 fixture 准备后，在 Auto Save 行为断言失败。启动参数加入 `--no-hot` 后，run `37576576627` 的完整 E2E（含 Auto Save 与三轮生命周期循环）通过；日志验收的后续失败见下节。
+
+## 日志验收的 CDP 连接与渲染调度（2026-10-07）
+
+- Run `37576576627` 的失败产物显示，日志验收前六项均通过；在 toolbar stop 后启动 `preview-6` 时，Flutter、浏览器和日志连接均在运行，测试重新发现 CDP 目标超时。失败发生在重新启动阶段。
+- 页面就绪检查复用已有 CDP 连接，目标关闭时仍按原有预算重连。新会话和刷新仍必须产生新文档标识，保留页面内容、日志与退出提示的全部断言。
+- 本地还复现了已渲染页面的布局帧等待超时。独立 VS Code 测试宿主加入 Chromium 的后台调度参数，避免切换标签、调试会话和遮挡窗口时的渲染限流；这些参数仅用于自动化测试。
+- 类型检查、lint 与 9 项 CDP 回归测试通过。本机 VS Code 1.140.0 / Flutter 3.49.0-1.0.pre-240 完整日志验收通过，包含 toolbar stop 后的 `preview-6` 页面就绪与最终退出检查；记录位于 `.cache/logs-cdp-scheduled/` 和 `.cache/logs-cdp-scheduled.log`。云端结果待本次推送验证。
 
 ## CI 失败判据与浏览器等待修正（2026-10-05）
 
