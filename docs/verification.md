@@ -6,6 +6,11 @@
 - 生命周期压力循环由 20 轮降至 3 轮，依次覆盖 restart、关闭预览标签和 stop 清理路径。此处调整的是 CI 配置；GitHub Actions 尚未运行验证。
 - 本机 Flutter 更新后，应同步更新 `.github/workflows/ci.yml` 的 Flutter revision、显示版本和集成产物名称。
 
+## Windows Flutter SDK 检出路径修正（2026-10-07）
+
+- GitHub Actions run `37474092801` 在检出 Flutter 源码时，因 `engine/...golden...png` 完整路径超过 Git for Windows 的默认限制而失败（`Filename too long`）。
+- 为该检出命令启用 `core.longpaths`，并将 SDK 目录缩短为 `.cache/f`。修复尚未由后续云端 CI 验证。
+
 ## CI 失败判据与浏览器等待修正（2026-10-05）
 
 - `3f8a8ce` 的第一次 CI 在 Flutter 3.47.6 的日志验收中出现 CDP 单次求值超时；第二次在“编译失败保留旧页面”断言中失败。第二次产物只证明版本 2 曾成功显示，没有清理前的页面和编译结果，不能据此断定 Flutter 丢失了旧页面。

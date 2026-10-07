@@ -34,7 +34,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 45
     env:
-      FLUTTER_SDK_PATH: ${{ github.workspace }}\.cache\flutter-sdk
+      FLUTTER_SDK_PATH: ${{ github.workspace }}\.cache\f
       PUB_CACHE: ${{ github.workspace }}\.cache\pub
       PREVIEW_TEST_MODE: e2e
       PREVIEW_STRESS_CYCLES: '3'
@@ -49,10 +49,14 @@ jobs:
       - run: npm ci
       - name: Checkout Flutter 3.49.0-1.0.pre-240
         uses: actions/checkout@v7
+        env:
+          GIT_CONFIG_COUNT: '1'
+          GIT_CONFIG_KEY_0: core.longpaths
+          GIT_CONFIG_VALUE_0: 'true'
         with:
           repository: flutter/flutter
           ref: 4e5a09292c1c64a38d604c7ec096537f50d69f93
-          path: .cache/flutter-sdk
+          path: .cache/f
           persist-credentials: false
       - name: Bootstrap Flutter SDK
         run: '& "$env:FLUTTER_SDK_PATH\bin\flutter.bat" --suppress-analytics --version'
