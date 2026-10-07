@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.6
+
+- Let Flutter hot restart update the preview after Dart saves and explicit Reload Web Preview requests, without adding a second full-page browser reload.
+- Keep Reload Preview Browser as an explicit page reload. Refresh automatically only when Flutter explicitly reports that the compiled page requires refresh or no client received the update.
+- Verify visible UI updates, retained browser documents, editor focus, save deduplication, compilation error recovery, and continued application logging.
+
 ## 0.1.5
 
 - Detect whether the Flutter SDK supports `--no-web-experimental-hot-reload`. Keep the restart-oriented compiler on older SDKs and use the SDK default when newer releases remove the option.

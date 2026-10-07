@@ -19,6 +19,17 @@ function setup() {
 }
 afterEach(() => vi.useRealTimers());
 describe('update scheduling and cleanup', () => {
+  it('finishes a saved update without browser refresh and retains explicit browser reload', async () => {
+    vi.useFakeTimers(); const app = setup();
+    app.controller.save(300); await vi.advanceTimersByTimeAsync(300);
+    expect(app.runtime.recompile).toHaveBeenCalledExactlyOnceWith('preview-1', 'save', 3000);
+    app.compile({ code: 0, requiresBrowserRefresh: false }); await Promise.resolve();
+    expect(app.controller.current.state.kind).toBe('running');
+    expect(app.browser.refresh).not.toHaveBeenCalled();
+    app.controller.dispatch({ type: 'REFRESH_BROWSER' });
+    expect(app.browser.refresh).toHaveBeenCalledExactlyOnceWith('preview-1', undefined);
+    const cleanup = app.controller.dispose(); app.finishStop(); await cleanup;
+  });
   it('a manual update consumes a pending save without a redundant compilation', async () => {
     vi.useFakeTimers(); const app = setup();
     app.controller.save(300);

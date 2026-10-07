@@ -22,6 +22,7 @@ export async function endToEnd(): Promise<void> {
   let phase = 'startup';
   let devTools: DevTools | undefined;
   const command = (name: string, ...args: unknown[]) => vscode.commands.executeCommand(`flutterWebPreview.${name}`, ...args);
+  const requiresBrowserRefresh = process.env.PREVIEW_EXPECT_BROWSER_REFRESH === '1';
   const document = await vscode.workspace.openTextDocument(file);
   const config = vscode.workspace.getConfiguration('flutterWebPreview', file);
   const initialSdk = config.inspect<string>('flutterSdkPath')?.workspaceValue;
@@ -34,12 +35,27 @@ export async function endToEnd(): Promise<void> {
   const initialAutoSaveDelay = filesConfig.inspect<number>('autoSaveDelay')?.workspaceValue;
   const replace = async (text: string, save = true) => {
     const edit = new vscode.WorkspaceEdit(); edit.replace(file, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)), text);
-    assert(await vscode.workspace.applyEdit(edit)); if (save) assert(await document.save());
+    assert(await vscode.workspace.applyEdit(edit));
+    if (save) { await vscode.window.showTextDocument(document, vscode.ViewColumn.One); assert.equal(await command('saveAndReload'), true); }
   };
   const rendered = async (expected: string, documents: DocumentExpectation = {}) => {
     const connection = { current: devTools };
     try { await waitForText(connection, api.getStatus().url ?? `http://127.0.0.1:${testPort}`, expected, 60000, documents); }
     finally { devTools = connection.current; }
+  };
+  const updated = async (expected: string, action: () => PromiseLike<unknown>) => {
+    const before = api.getStatus();
+    const beforeDocument = await devTools!.documentId();
+    await action();
+    await until(() => api.getStatus().state === 'failed' || ((api.getStatus().lastCompilation?.operationId ?? 0) > (before.lastCompilation?.operationId ?? 0) && api.getStatus().state === 'running'), 60000);
+    const status = api.getStatus();
+    assert.equal(status.state, 'running', status.error);
+    assert.equal(status.lastCompilation?.code, 0, status.error);
+    assert.equal(status.lastCompilation.requiresBrowserRefresh, requiresBrowserRefresh, 'Flutter must identify whether this update needs a browser refresh');
+    const refreshCount = before.refreshCount + Number(requiresBrowserRefresh);
+    if (requiresBrowserRefresh) await until(() => api.getStatus().refreshCount === refreshCount, 5000);
+    await rendered(expected, requiresBrowserRefresh ? { previousDocument: beforeDocument } : { retainedDocument: beforeDocument });
+    assert.equal(api.getStatus().refreshCount, refreshCount, 'Flutter updates must not receive an additional browser refresh');
   };
   try {
     await filesConfig.update('autoSave', 'off', vscode.ConfigurationTarget.Workspace);
@@ -58,25 +74,32 @@ export async function endToEnd(): Promise<void> {
     assert.equal(api.getStatus().state, 'running', api.getStatus().error);
     await rendered('Preview version 1'); await devTools!.screenshot(path.join(artifacts, 'preview-before.png'));
     checks.push('Run renders Flutter in Integrated Browser');
-    phase = 'save and complete browser navigation';
+    phase = 'save updates without additional browser navigation';
     const initialDocument = await devTools!.documentId();
     const initialRefreshes = api.getStatus().refreshCount;
     await vscode.window.showTextDocument(document, vscode.ViewColumn.One);
-    await replace(original.replace('Preview version 1', 'Preview version 2'), false);
-    assert.equal(await command('saveAndReload'), true);
+    await updated('Preview version 2', async () => {
+      await replace(original.replace('Preview version 1', 'Preview version 2'), false);
+      assert.equal(await command('saveAndReload'), true);
+    });
     assert.equal(document.isDirty, false, 'Save and Reload must save the captured document');
-    await until(() => api.getStatus().state === 'failed' || (api.getStatus().lastCompilation?.code === 0 && api.getStatus().refreshCount > initialRefreshes), 60000);
     const savedOperation = api.getStatus().lastCompilation?.operationId;
     assert.equal(api.getStatus().state, 'running', api.getStatus().error);
-    await rendered('Preview version 2', { previousDocument: initialDocument });
-    await until(() => api.getStatus().lastRefreshLatencyMs !== undefined && vscode.window.activeTextEditor?.document.uri.toString() === file.toString(), 5000);
-    assert(api.getStatus().lastRefreshLatencyMs !== undefined && api.getStatus().lastRefreshLatencyMs! <= 500, 'Successful compile must request browser refresh within 500 ms');
-    assert.equal(vscode.window.activeTextEditor?.document.uri.toString(), file.toString(), 'Automatic refresh must restore code focus');
+    assert.equal(vscode.window.activeTextEditor?.document.uri.toString(), file.toString(), 'Saved updates must preserve code focus');
     await devTools!.screenshot(path.join(artifacts, 'preview-after.png'));
     await wait(1000);
     assert.equal(api.getStatus().lastCompilation?.operationId, savedOperation, 'Explicit save and passive events must not enqueue another compilation');
-    assert.equal(api.getStatus().refreshCount, initialRefreshes + 1, 'Explicit save and passive events must refresh only once');
-    checks.push('Save and Reload saves, compiles once and visibly updates page');
+    assert.equal(api.getStatus().refreshCount, initialRefreshes + Number(requiresBrowserRefresh), 'Explicit save and passive events must not add a browser refresh');
+    await rendered('Preview version 2', requiresBrowserRefresh ? {} : { retainedDocument: initialDocument });
+    checks.push('Save and Reload saves and compiles once; updated UI remains visible without additional browser navigation');
+    phase = 'explicit browser reload';
+    const beforeBrowserReload = api.getStatus();
+    const beforeBrowserDocument = await devTools!.documentId();
+    await command('reloadBrowser');
+    await until(() => api.getStatus().refreshCount === beforeBrowserReload.refreshCount + 1, 5000);
+    await rendered('Preview version 2', { previousDocument: beforeBrowserDocument });
+    assert.equal(api.getStatus().lastCompilation?.operationId, beforeBrowserReload.lastCompilation?.operationId, 'Browser reload must not compile');
+    checks.push('Explicit Reload Preview Browser still navigates once without recompiling');
     phase = 'compile failure retains the existing document';
     const beforeFailure = api.getStatus();
     const retainedDocument = await devTools!.documentId();
@@ -91,8 +114,8 @@ export async function endToEnd(): Promise<void> {
     assert.equal(api.getStatus().refreshCount, beforeFailure.refreshCount);
     assert.equal(api.getStatus().lastCompilation?.operationId, failedCompile.lastCompilation.operationId);
     phase = 'repair and remaining lifecycle checks';
-    await replace(original.replace('Preview version 1', 'Preview version 3'));
-    await rendered('Preview version 3'); checks.push('compiler failure retains page, save repairs it');
+    await updated('Preview version 3', () => replace(original.replace('Preview version 1', 'Preview version 3')));
+    checks.push('compiler failure retains page, save repairs it');
     await filesConfig.update('autoSave', 'afterDelay', vscode.ConfigurationTarget.Workspace);
     await filesConfig.update('autoSaveDelay', 300, vscode.ConfigurationTarget.Workspace);
     const beforeAutoSave = api.getStatus();
@@ -104,11 +127,11 @@ export async function endToEnd(): Promise<void> {
     assert.equal(api.getStatus().lastCompilation?.operationId, beforeAutoSave.lastCompilation?.operationId);
     assert.equal(api.getStatus().refreshCount, beforeAutoSave.refreshCount);
     await vscode.window.showTextDocument(document, vscode.ViewColumn.One);
-    assert.equal(await command('saveAndReload'), true);
-    await rendered('Preview version auto'); checks.push('Auto Save retains the page by default; explicit save updates it even after Auto Save');
+    await updated('Preview version auto', () => command('saveAndReload'));
+    checks.push('Auto Save retains the page by default; explicit save updates it even after Auto Save');
     await config.update('reloadOnAutoSave', true, vscode.ConfigurationTarget.Workspace);
-    await replace(original.replace('Preview version 1', 'Preview version auto enabled'), false);
-    await rendered('Preview version auto enabled'); checks.push('reloadOnAutoSave opt-in updates the page on Auto Save');
+    await updated('Preview version auto enabled', () => replace(original.replace('Preview version 1', 'Preview version auto enabled'), false));
+    checks.push('reloadOnAutoSave opt-in updates the page on Auto Save');
     await filesConfig.update('autoSave', 'off', vscode.ConfigurationTarget.Workspace);
     await config.update('reloadOnSave', false, vscode.ConfigurationTarget.Workspace);
     const beforeDisabled = api.getStatus();
@@ -121,14 +144,15 @@ export async function endToEnd(): Promise<void> {
     assert.equal(api.getStatus().lastCompilation?.operationId, beforeDisabled.lastCompilation?.operationId);
     assert.equal(api.getStatus().refreshCount, beforeDisabled.refreshCount);
     await config.update('reloadOnSave', true, vscode.ConfigurationTarget.Workspace);
-    await replace(original.replace('Preview version 1', 'Preview version enabled'));
-    await rendered('Preview version enabled'); checks.push('reloadOnSave changes take effect immediately');
+    await updated('Preview version enabled', () => replace(original.replace('Preview version 1', 'Preview version enabled')));
+    checks.push('reloadOnSave changes take effect immediately');
     await config.update('reloadTimeout', 0, vscode.ConfigurationTarget.Workspace);
     await command('reload'); await until(() => !!api.getStatus().error?.includes('reloadTimeout'), 5000);
     assert.equal(api.getStatus().state, 'running');
     await config.update('reloadTimeout', 30000, vscode.ConfigurationTarget.Workspace);
-    await replace(original.replace('Preview version 1', 'Preview version repaired'));
-    await rendered('Preview version repaired'); checks.push('invalid live timeout is recoverable');
+    await updated('Preview version repaired', () => replace(original.replace('Preview version 1', 'Preview version repaired')));
+    await updated('Preview version repaired', () => command('reload'));
+    checks.push('invalid live timeout is recoverable; manual Reload Web Preview updates through Flutter');
     await vscode.commands.executeCommand('workbench.action.browser.open', { reuseUrlFilter: `http://127.0.0.1:${testPort}/**` });
     const previous = vscode.window.tabGroups.activeTabGroup.activeTab; assert(previous);
     await vscode.commands.executeCommand('workbench.action.moveEditorToNextGroup'); await wait(400);
@@ -137,8 +161,8 @@ export async function endToEnd(): Promise<void> {
     await until(() => !api.getStatus().browserAvailable, 5000);
     await command('openBrowser');
     await until(() => api.getStatus().browserAvailable, 5000);
-    await replace(original.replace('Preview version 1', 'Preview version 4'));
-    await rendered('Preview version 4');
+    await rendered('Preview version repaired');
+    await updated('Preview version 4', () => replace(original.replace('Preview version 1', 'Preview version 4')));
     checks.push('unavailable ownership pauses updates; explicit browser open safely rebinds');
     devTools?.close(); devTools = undefined;
     await vscode.window.tabGroups.close(moved); await until(() => api.getStatus().state === 'stopped', 15000); await checkPort(testPort);

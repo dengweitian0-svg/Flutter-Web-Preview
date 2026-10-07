@@ -83,8 +83,13 @@ async function runtimeLifecycle(): Promise<void> {
     assert(browser.currentTab);
     await writeFile(file, original.replace('Preview version 1', 'Preview version 2'));
     controller.save(20);
-    await until(() => log.some(text => text.includes('Preview browser refreshed.')) || report.length > 0, 45000);
+    await until(() => controller.current.context.lastCompilation !== undefined || report.length > 0, 45000);
     assert.equal(report.length, 0, report.join('\n'));
+    assert.equal(controller.current.context.lastCompilation?.code, 0);
+    const requiresBrowserRefresh = process.env.PREVIEW_EXPECT_BROWSER_REFRESH === '1';
+    assert.equal(controller.current.context.lastCompilation?.requiresBrowserRefresh, requiresBrowserRefresh);
+    if (requiresBrowserRefresh) await until(() => log.some(text => text.includes('Preview browser refreshed.')), 5000);
+    else assert(!log.some(text => text.includes('Preview browser refreshed.')), 'Flutter updates must not add a browser refresh');
     await browser.open(sessionId(controller.current.state)!, controller.current.context.url!);
     await vscode.commands.executeCommand('workbench.action.browser.open', { reuseUrlFilter: 'http://127.0.0.1:7357/**' });
     await vscode.commands.executeCommand('workbench.action.moveEditorToNextGroup'); await wait(400);

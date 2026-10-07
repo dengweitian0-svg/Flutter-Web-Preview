@@ -55,7 +55,7 @@ export type SessionEvent =
   | { type: 'LOG_SESSION_STARTED' | 'LOG_SESSION_ENDED'; sessionId: string; bindingId: string }
   | { type: 'LOG_SESSION_ERROR'; sessionId: string; bindingId: string; message: string }
   | { type: 'LOG_CONSOLE_STOP_REQUEST'; sessionId: string }
-  | { type: 'COMPILED'; sessionId: string; operationId: number; code: number; message?: string; completedAt?: number }
+  | ({ type: 'COMPILED'; sessionId: string; operationId: number } & CompileResult)
   | { type: 'FATAL'; sessionId: string; message: string }
   | { type: 'CLEANED'; sessionId: string }
   | { type: 'CLEANUP_FAILED'; sessionId: string; message: string };
@@ -73,7 +73,7 @@ export interface ConsoleResult { cleaned: boolean; failure?: string }
 export interface Transition extends Snapshot { effects: Effect[] }
 export interface Disposable { dispose(): void }
 export interface EventSource<T> { subscribe(listener: (event: T) => void): Disposable }
-export interface CompileResult { code: number; message?: string; completedAt?: number }
+export interface CompileResult { code: number; message?: string; completedAt?: number; requiresBrowserRefresh?: boolean }
 export type RuntimeEvent =
   | Extract<SessionEvent, { type: 'APP_ID' | 'URL' | 'STARTED' | 'FATAL' }>;
 export type BrowserEvent = Extract<SessionEvent, { type: 'BROWSER_OPENED' | 'BROWSER_CLOSED' | 'BROWSER_ERROR' | 'BROWSER_REFRESHED' | 'LOG_SESSION_STARTED' | 'LOG_SESSION_ENDED' | 'LOG_SESSION_ERROR' | 'LOG_CONSOLE_STOP_REQUEST' }>;

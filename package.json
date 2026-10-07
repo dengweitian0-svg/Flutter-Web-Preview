@@ -2,7 +2,7 @@
   "name": "flutter-web-preview",
   "displayName": "Flutter Web Preview",
   "description": "Preview Flutter Web inside VS Code, update on Dart save, and stop when the preview closes.",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "publisher": "wende",
   "license": "MIT",
   "repository": { "type": "git", "url": "https://github.com/dengweitian0-svg/Flutter-Web-Preview.git" },
@@ -39,8 +39,8 @@
         "flutterWebPreview.flutterSdkPath": { "type": "string", "default": "", "scope": "machine-overridable", "description": "Flutter SDK root. Falls back to dart.flutterSdkPath and PATH." },
         "flutterWebPreview.entrypoint": { "type": "string", "default": "lib/main.dart", "scope": "resource", "description": "Default entrypoint relative to the Flutter project." },
         "flutterWebPreview.port": { "type": "integer", "default": 7357, "minimum": 1024, "maximum": 65535, "scope": "resource", "description": "Local Flutter Web server port. Changes apply on next start." },
-        "flutterWebPreview.reloadOnSave": { "type": "boolean", "default": true, "scope": "resource", "description": "Automatically recompile and refresh on Dart save. Page state may reset." },
-        "flutterWebPreview.reloadOnAutoSave": { "type": "boolean", "default": false, "scope": "resource", "description": "Also recompile and refresh on automatic or unknown-source Dart saves. Requires reloadOnSave. Disabled by default; use Save and Reload Web Preview for manual saves without a will-save notification." },
+        "flutterWebPreview.reloadOnSave": { "type": "boolean", "default": true, "scope": "resource", "description": "Automatically recompile and hot restart on Dart save. Refresh the page only when Flutter requires it. App state may reset." },
+        "flutterWebPreview.reloadOnAutoSave": { "type": "boolean", "default": false, "scope": "resource", "description": "Also recompile and hot restart on automatic or unknown-source Dart saves. Requires reloadOnSave. Disabled by default; use Save and Reload Web Preview for manual saves without a will-save notification." },
         "flutterWebPreview.reloadDelay": { "type": "integer", "default": 300, "minimum": 0, "maximum": 60000, "scope": "resource", "description": "Debounce delay in milliseconds." },
         "flutterWebPreview.startupTimeout": { "type": "integer", "default": 180000, "minimum": 1000, "maximum": 3600000, "scope": "resource", "description": "Flutter startup timeout in milliseconds." },
         "flutterWebPreview.reloadTimeout": { "type": "integer", "default": 30000, "minimum": 1000, "maximum": 3600000, "scope": "resource", "description": "Compilation timeout in milliseconds." },
@@ -56,7 +56,7 @@
     "test": "node scripts/prepare-artifacts.mjs && vitest run",
     "test:extension": "npm run build && node scripts/test-extension.mjs",
     "vscode:prepublish": "npm run check && npm run build",
-    "package": "node scripts/prepare-artifacts.mjs && vsce package --no-dependencies --out artifacts/flutter-web-preview-0.1.5.vsix"
+    "package": "node scripts/prepare-artifacts.mjs && vsce package --no-dependencies --out artifacts/flutter-web-preview-0.1.6.vsix"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
