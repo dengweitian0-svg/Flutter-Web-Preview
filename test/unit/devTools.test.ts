@@ -63,7 +63,7 @@ describe('CDP page verification', () => {
     stale.documentId.mockResolvedValueOnce('old').mockRejectedValueOnce(new TransientCdpError('Navigation interrupted'));
     vi.spyOn(DevTools, 'connect').mockResolvedValueOnce(stale as unknown as DevTools).mockResolvedValueOnce(fresh as unknown as DevTools);
     const connection: { current?: DevTools } = {};
-    await waitForText(connection, 'http://localhost/', 'Preview version 2', 2000, 'old');
+    await waitForText(connection, 'http://localhost/', 'Preview version 2', 2000, { previousDocument: 'old' });
     expect(stale.text).not.toHaveBeenCalled(); expect(stale.close).toHaveBeenCalledOnce();
     expect(fresh.text).toHaveBeenCalledOnce(); expect(connection.current).toBe(fresh);
   });
@@ -77,7 +77,7 @@ describe('CDP page verification', () => {
     const client = { documentId: vi.fn().mockResolvedValueOnce('old').mockResolvedValue('new'), evaluate: vi.fn(async () => 'complete'), text: vi.fn(async () => 'Emit preview logs'), close: vi.fn() };
     const discovery = vi.spyOn(DevTools, 'connect').mockRejectedValue(new TransientCdpError('Discovery is unavailable'));
     const connection = { current: client as unknown as DevTools };
-    await waitForText(connection, 'http://localhost/', 'Emit preview logs', 2000, 'old');
+    await waitForText(connection, 'http://localhost/', 'Emit preview logs', 2000, { previousDocument: 'old' });
     expect(client.documentId).toHaveBeenCalledTimes(2);
     expect(client.text).toHaveBeenCalledOnce();
     expect(discovery).not.toHaveBeenCalled(); expect(client.close).not.toHaveBeenCalled();
@@ -87,5 +87,21 @@ describe('CDP page verification', () => {
     const client = { documentId: vi.fn(async () => 'new'), evaluate: vi.fn(async () => 'loading') };
     vi.spyOn(DevTools, 'connect').mockResolvedValue(client as unknown as DevTools);
     await expect(waitForText({}, 'http://localhost/', 'Version', 50)).rejects.toThrow('within 50 ms');
+  });
+  it('waits for transiently empty semantics text while retaining the same document', async () => {
+    const client = { documentId: vi.fn(async () => 'retained'), evaluate: vi.fn(async () => 'complete'), text: vi.fn().mockResolvedValueOnce('').mockResolvedValue('Old page') };
+    await waitForText({ current: client as unknown as DevTools }, 'http://localhost/', 'Old page', 2000, { retainedDocument: 'retained' });
+    expect(client.text).toHaveBeenCalledTimes(2);
+    expect(client.documentId).toHaveBeenCalledTimes(3);
+  });
+  it('fails immediately if a retained document navigates even when the expected text exists', async () => {
+    const client = { documentId: vi.fn(async () => 'new'), evaluate: vi.fn(async () => 'complete'), text: vi.fn(async () => 'Old page') };
+    await expect(waitForText({ current: client as unknown as DevTools }, 'http://localhost/', 'Old page', 2000, { retainedDocument: 'old' })).rejects.toThrow('Page document changed');
+    expect(client.documentId).toHaveBeenCalledOnce(); expect(client.text).not.toHaveBeenCalled();
+  });
+  it('rejects navigation that occurs during the retained page text read', async () => {
+    const client = { documentId: vi.fn().mockResolvedValueOnce('old').mockResolvedValue('new'), evaluate: vi.fn(async () => 'complete'), text: vi.fn(async () => 'Old page') };
+    await expect(waitForText({ current: client as unknown as DevTools }, 'http://localhost/', 'Old page', 2000, { retainedDocument: 'old' })).rejects.toThrow('Page document changed');
+    expect(client.text).toHaveBeenCalledOnce(); expect(client.documentId).toHaveBeenCalledTimes(2);
   });
 });

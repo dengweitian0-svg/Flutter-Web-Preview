@@ -92,7 +92,7 @@ export async function logConsoleTest(): Promise<void> {
     console.log(`LOG CONSOLE WAIT: ${phase}; session=${status.sessionId}; refreshes=${status.refreshCount}`);
     try {
       // Reused tabs may still display the previous application's DOM during startup.
-      await waitForText(connection, status.url!, 'Emit preview logs', 60000, previousDocument);
+      await waitForText(connection, status.url!, 'Emit preview logs', 60000, { previousDocument });
       readyDocument = await connection.current!.documentId(); readySession = status.sessionId; readyRefreshes = status.refreshCount;
       console.log(`LOG CONSOLE READY: ${phase}; session=${readySession}`);
     }
@@ -174,7 +174,7 @@ export async function logConsoleTest(): Promise<void> {
     await until(() => api.getStatus().state === 'failed' || ((api.getStatus().lastCompilation?.operationId ?? 0) > (beforeSave.lastCompilation?.operationId ?? 0) && api.getStatus().refreshCount > beforeSave.refreshCount), 60000);
     assert.equal(api.getStatus().state, 'running', api.getStatus().error);
     const savedConnection = { current: preview };
-    try { await waitForText(savedConnection, api.getStatus().url!, 'Preview logs saved', 60000, beforeSaveDocument); }
+    try { await waitForText(savedConnection, api.getStatus().url!, 'Preview logs saved', 60000, { previousDocument: beforeSaveDocument }); }
     finally { preview = savedConnection.current; }
     await wait(500); await ready('Dart save');
     assert.equal(vscode.window.activeTextEditor?.document.uri.toString(), file.toString(), 'Save refresh must preserve editor focus');

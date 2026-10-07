@@ -128,8 +128,9 @@ export class DevTools {
   close(): void { this.disconnect(new TransientCdpError('CDP closed.')); this.socket.close(); }
 }
 
+export interface DocumentExpectation { previousDocument?: string; retainedDocument?: string }
 /** Retry only navigation/connection failures; evaluation and assertion failures stay visible. */
-export async function waitForText(connection: { current?: DevTools }, url: string, expected: string, timeout = 60000, previousDocument?: string): Promise<void> {
+export async function waitForText(connection: { current?: DevTools }, url: string, expected: string, timeout = 60000, { previousDocument, retainedDocument }: DocumentExpectation = {}): Promise<void> {
   const deadline = Date.now() + timeout;
   const remaining = () => Math.max(1, Math.min(10000, deadline - Date.now()));
   let last: unknown;
@@ -138,7 +139,14 @@ export async function waitForText(connection: { current?: DevTools }, url: strin
       connection.current ??= await DevTools.connect(url, cdpPort, remaining());
       const client = connection.current;
       const document = await client.documentId(remaining());
-      if ((!previousDocument || document !== previousDocument) && await client.evaluate('document.readyState', remaining()) === 'complete' && (await client.text(remaining())).includes(expected) && Date.now() <= deadline) return;
+      if (retainedDocument && document !== retainedDocument) throw new Error(`Page document changed from ${retainedDocument} to ${document} while it must be retained.`);
+      if ((!previousDocument || document !== previousDocument) && await client.evaluate('document.readyState', remaining()) === 'complete' && (await client.text(remaining())).includes(expected)) {
+        if (retainedDocument) {
+          const currentDocument = await client.documentId(remaining());
+          if (currentDocument !== retainedDocument) throw new Error(`Page document changed from ${retainedDocument} to ${currentDocument} while it must be retained.`);
+        }
+        if (Date.now() <= deadline) return;
+      }
       last = `Document ${document} does not yet contain ${expected}`;
     } catch (error) {
       if (!(error instanceof TransientCdpError)) throw error;

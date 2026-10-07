@@ -4,7 +4,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { checkPort } from '../../src/flutter/flutterRuntime';
 import type { PreviewApi } from '../../src/extension';
-import { DevTools, testPort, waitForText } from './devTools';
+import { DevTools, testPort, waitForText, type DocumentExpectation } from './devTools';
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 async function until(predicate: () => boolean | Promise<boolean>, timeout = 180000): Promise<void> {
@@ -36,9 +36,9 @@ export async function endToEnd(): Promise<void> {
     const edit = new vscode.WorkspaceEdit(); edit.replace(file, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)), text);
     assert(await vscode.workspace.applyEdit(edit)); if (save) assert(await document.save());
   };
-  const rendered = async (expected: string, previousDocument?: string) => {
+  const rendered = async (expected: string, documents: DocumentExpectation = {}) => {
     const connection = { current: devTools };
-    try { await waitForText(connection, api.getStatus().url ?? `http://127.0.0.1:${testPort}`, expected, 60000, previousDocument); }
+    try { await waitForText(connection, api.getStatus().url ?? `http://127.0.0.1:${testPort}`, expected, 60000, documents); }
     finally { devTools = connection.current; }
   };
   try {
@@ -68,7 +68,7 @@ export async function endToEnd(): Promise<void> {
     await until(() => api.getStatus().state === 'failed' || (api.getStatus().lastCompilation?.code === 0 && api.getStatus().refreshCount > initialRefreshes), 60000);
     const savedOperation = api.getStatus().lastCompilation?.operationId;
     assert.equal(api.getStatus().state, 'running', api.getStatus().error);
-    await rendered('Preview version 2', initialDocument);
+    await rendered('Preview version 2', { previousDocument: initialDocument });
     await until(() => api.getStatus().lastRefreshLatencyMs !== undefined && vscode.window.activeTextEditor?.document.uri.toString() === file.toString(), 5000);
     assert(api.getStatus().lastRefreshLatencyMs !== undefined && api.getStatus().lastRefreshLatencyMs! <= 500, 'Successful compile must request browser refresh within 500 ms');
     assert.equal(vscode.window.activeTextEditor?.document.uri.toString(), file.toString(), 'Automatic refresh must restore code focus');
@@ -87,20 +87,22 @@ export async function endToEnd(): Promise<void> {
     assert(failedCompile.lastCompilation && failedCompile.lastCompilation.code !== 0, 'The invalid edit must produce a failed compilation');
     assert.equal(failedCompile.refreshCount, beforeFailure.refreshCount, 'A failed compilation must not refresh the browser');
     assert.equal(await devTools!.documentId(), retainedDocument, 'A failed compilation must preserve the current document');
-    const retainedText = await devTools!.text();
-    assert(retainedText.includes('Preview version 2'), `Failed compilation lost the previous page: ${retainedText}`);
+    await rendered('Preview version 2', { retainedDocument });
+    assert.equal(api.getStatus().refreshCount, beforeFailure.refreshCount);
+    assert.equal(api.getStatus().lastCompilation?.operationId, failedCompile.lastCompilation.operationId);
     phase = 'repair and remaining lifecycle checks';
     await replace(original.replace('Preview version 1', 'Preview version 3'));
     await rendered('Preview version 3'); checks.push('compiler failure retains page, save repairs it');
     await filesConfig.update('autoSave', 'afterDelay', vscode.ConfigurationTarget.Workspace);
     await filesConfig.update('autoSaveDelay', 300, vscode.ConfigurationTarget.Workspace);
     const beforeAutoSave = api.getStatus();
+    const beforeAutoSaveDocument = await devTools!.documentId();
     await replace(original.replace('Preview version 1', 'Preview version auto'), false);
     await until(() => !document.isDirty, 5000); await wait(1000);
     assert.equal(api.getStatus().state, 'running', 'Auto Save must not start a compilation by default');
+    await rendered('Preview version 3', { retainedDocument: beforeAutoSaveDocument });
     assert.equal(api.getStatus().lastCompilation?.operationId, beforeAutoSave.lastCompilation?.operationId);
     assert.equal(api.getStatus().refreshCount, beforeAutoSave.refreshCount);
-    assert((await devTools!.text()).includes('Preview version 3'), 'Auto Save must retain the preview by default');
     await vscode.window.showTextDocument(document, vscode.ViewColumn.One);
     assert.equal(await command('saveAndReload'), true);
     await rendered('Preview version auto'); checks.push('Auto Save retains the page by default; explicit save updates it even after Auto Save');
@@ -110,13 +112,14 @@ export async function endToEnd(): Promise<void> {
     await filesConfig.update('autoSave', 'off', vscode.ConfigurationTarget.Workspace);
     await config.update('reloadOnSave', false, vscode.ConfigurationTarget.Workspace);
     const beforeDisabled = api.getStatus();
+    const beforeDisabledDocument = await devTools!.documentId();
     await vscode.window.showTextDocument(document, vscode.ViewColumn.One);
     await replace(original.replace('Preview version 1', 'Preview version disabled'), false);
     assert.equal(await command('saveAndReload'), true); await wait(700);
     assert.equal(document.isDirty, false, 'reloadOnSave=false must still allow saving');
+    await rendered('Preview version auto enabled', { retainedDocument: beforeDisabledDocument });
     assert.equal(api.getStatus().lastCompilation?.operationId, beforeDisabled.lastCompilation?.operationId);
     assert.equal(api.getStatus().refreshCount, beforeDisabled.refreshCount);
-    assert((await devTools!.text()).includes('Preview version auto enabled'));
     await config.update('reloadOnSave', true, vscode.ConfigurationTarget.Workspace);
     await replace(original.replace('Preview version 1', 'Preview version enabled'));
     await rendered('Preview version enabled'); checks.push('reloadOnSave changes take effect immediately');
