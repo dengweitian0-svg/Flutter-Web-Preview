@@ -55,13 +55,24 @@ describe('session transitions', () => {
     expect(step(first, { type: 'RUN', spec }).effects).toEqual([]);
     expect(step(ready(), { type: 'RUN', spec }).effects.map(e => e.type)).toEqual(['OPEN']);
   });
-  it('only successful current operation can refresh', () => {
-    const update = step(ready(), { type: 'UPDATE', reason: 'save' });
+  it.each(['save', 'manual'] as const)('%s updates do not refresh a page already updated by Flutter', reason => {
+    const update = step(ready(), { type: 'UPDATE', reason });
     expect(update.state.kind).toBe('updating');
     expect(step(update, { type: 'COMPILED', sessionId: 'preview-1', operationId: 999, code: 0 }).effects).toEqual([]);
     const done = step(update, { type: 'COMPILED', sessionId: 'preview-1', operationId: 2, code: 0 });
     expect(done.state.kind).toBe('running');
-    expect(done.effects.some(e => e.type === 'REFRESH')).toBe(true);
+    expect(done.effects).toEqual([]);
+    expect(done.context.lastCompilation?.code).toBe(0);
+    expect(step(done, { type: 'REFRESH_BROWSER' }).effects).toEqual([{ type: 'REFRESH', sessionId: 'preview-1' }]);
+  });
+  it('refreshes only when the current successful compilation explicitly requires it', () => {
+    const update = step(ready(), { type: 'UPDATE', reason: 'save' });
+    expect(step(update, { type: 'COMPILED', sessionId: 'old', operationId: 2, code: 0, requiresBrowserRefresh: true }).effects).toEqual([]);
+    expect(step(update, { type: 'COMPILED', sessionId: 'preview-1', operationId: 999, code: 0, requiresBrowserRefresh: true }).effects).toEqual([]);
+    const done = step(update, { type: 'COMPILED', sessionId: 'preview-1', operationId: 2, code: 0, requiresBrowserRefresh: true, completedAt: 100 });
+    expect(done.effects).toEqual([{ type: 'REFRESH', sessionId: 'preview-1', operationId: 2, completedAt: 100 }]);
+    const failure = step(update, { type: 'COMPILED', sessionId: 'preview-1', operationId: 2, code: 1, requiresBrowserRefresh: true });
+    expect(failure.effects.map(effect => effect.type)).toEqual(['REPORT']);
   });
   it('compiler errors are recoverable and never refresh', () => {
     const update = step(ready(), { type: 'UPDATE', reason: 'manual' });
@@ -75,7 +86,7 @@ describe('session transitions', () => {
     expect(logged.context.lastCompilation).toBeUndefined();
     const update = step(logged, { type: 'UPDATE', reason: 'save' });
     const failed = step(update, { type: 'COMPILED', sessionId: 'preview-1', operationId: 2, code: 1, message: 'Invalid Dart', completedAt: 100 });
-    expect(failed.context.lastCompilation).toEqual({ operationId: 2, code: 1, message: 'Invalid Dart', completedAt: 100 });
+    expect(failed.context.lastCompilation).toEqual({ operationId: 2, code: 1, message: 'Invalid Dart', completedAt: 100, requiresBrowserRefresh: undefined });
     expect(failed.context.logError).toBe('Attach failed');
     expect(step(failed, { type: 'COMPILED', sessionId: 'preview-1', operationId: 2, code: 0 }).context.lastCompilation?.code).toBe(1);
     const clean = step(step(failed, { type: 'STOP' }), { type: 'CLEANED', sessionId: 'preview-1' });

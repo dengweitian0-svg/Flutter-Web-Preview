@@ -39,11 +39,37 @@ describe.skipIf(process.platform !== 'win32')('managed Flutter process cleanup',
       expect(args).not.toContain('--no-web-experimental-hot-reload');
       expect(args).not.toContain('--web-experimental-hot-reload');
       expect(args).not.toContain('--no-pub');
-      expect(await runtime.recompile('updates', 'save', 1000)).toMatchObject({ code: 1 });
-      expect(await runtime.recompile('updates', 'save', 1000)).toMatchObject({ code: 0 });
+      expect(await runtime.recompile('updates', 'save', 1000)).toMatchObject({ code: 1, requiresBrowserRefresh: false });
+      expect(await runtime.recompile('updates', 'save', 1000)).toMatchObject({ code: 0, requiresBrowserRefresh: false });
       const request = JSON.parse(await readFile(path.join(fixture.root, 'request.json'), 'utf8'));
       expect(request).toMatchObject({ method: 'app.restart', params: { appId: 'app', fullRestart: true } });
     } finally { await runtime.stop('updates'); await rm(fixture.root, { recursive: true, force: true }); }
+  });
+  it('uses the refresh fallback only for the current tool status, not application logs or previous updates', async () => {
+    const fixture = await fakeSdk(`
+      process.stdout.write(JSON.stringify([{event:'app.start',params:{appId:'app'}}])+'\\n');
+      let count = 0;
+      require('node:readline').createInterface({input:process.stdin}).on('line', line => {
+        const request = JSON.parse(line)[0];
+        if (request.method === 'app.stop') process.exit(0);
+        if (count === 0) process.stdout.write('Recompile complete. Page requires refresh.\\n');
+        if (count === 1) process.stdout.write(JSON.stringify([{event:'app.log',params:{appId:'app',log:'Recompile complete. Page requires refresh.'}}])+'\\n');
+        if (count === 2) process.stdout.write(JSON.stringify([{event:'daemon.logMessage',params:{level:'status',message:'Recompile complete. Page requires refresh.'}}])+'\\n');
+        if (count === 3) process.stdout.write('Recompile complete. No client connected.\\n');
+        process.stdout.write(JSON.stringify([{id:request.id,result:{code:0}}])+'\\n');
+        count++;
+      });
+    `, true);
+    const runtime = new FlutterProcessRuntime(() => {});
+    const ready = new Promise<void>(resolve => runtime.events.subscribe(event => { if (event.type === 'APP_ID') resolve(); }));
+    try {
+      await runtime.start('fallback', fixture.spec); await ready;
+      expect(await runtime.recompile('fallback', 'save', 1000)).toMatchObject({ code: 0, requiresBrowserRefresh: true });
+      expect(await runtime.recompile('fallback', 'save', 1000)).toMatchObject({ code: 0, requiresBrowserRefresh: false });
+      expect(await runtime.recompile('fallback', 'manual', 1000)).toMatchObject({ code: 0, requiresBrowserRefresh: true });
+      expect(await runtime.recompile('fallback', 'save', 1000)).toMatchObject({ code: 0, requiresBrowserRefresh: true });
+      expect(await runtime.recompile('fallback', 'save', 1000)).toMatchObject({ code: 0, requiresBrowserRefresh: false });
+    } finally { await runtime.stop('fallback'); await rm(fixture.root, { recursive: true, force: true }); }
   });
   it('keeps the restart-oriented compiler when the Flutter SDK still supports it', async () => {
     const fixture = await fakeSdk(`

@@ -112,9 +112,9 @@ export function transition(snapshot: Snapshot, event: SessionEvent): Transition 
       break;
     case 'COMPILED':
       if (state.kind !== 'updating' || event.operationId !== state.operationId) break;
-      context.lastCompilation = { operationId: event.operationId, code: event.code, message: event.message, completedAt: event.completedAt };
+      context.lastCompilation = { operationId: event.operationId, code: event.code, message: event.message, completedAt: event.completedAt, requiresBrowserRefresh: event.requiresBrowserRefresh };
       result.state = { kind: 'running', session: state.session, lastError: event.code === 0 ? undefined : event.message ?? 'Flutter compilation failed.' };
-      if (event.code === 0 && context.browserOpen) effects.push({ type: 'REFRESH', sessionId: id!, operationId: event.operationId, completedAt: event.completedAt });
+      if (event.code === 0 && event.requiresBrowserRefresh && context.browserOpen) effects.push({ type: 'REFRESH', sessionId: id!, operationId: event.operationId, completedAt: event.completedAt });
       if (event.code !== 0) effects.push({ type: 'REPORT', message: event.message ?? 'Flutter compilation failed. Fix the Dart error and save again.' });
       drain();
       break;

@@ -11,6 +11,7 @@ interface ProcessSession {
   id: string; cancelled: boolean; appId?: string; process?: ChildProcessWithoutNullStreams;
   startedAt: number;
   client?: MachineClient; launch?: Promise<void>; stopping?: Promise<void>;
+  compilation?: { requiresBrowserRefresh: boolean };
   exited: Promise<void>; resolveExit(): void; closed: boolean;
 }
 export async function checkPort(port: number): Promise<void> {
@@ -68,7 +69,7 @@ export class FlutterProcessRuntime implements FlutterRuntime {
       const client = new MachineClient(text => {
         if (!child.stdin.writable) throw new Error('Flutter stdin is unavailable.');
         child.stdin.write(text);
-      }, this.log);
+      }, text => this.toolLog(session, text));
       session.client = client;
       child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');
       child.stdout.on('data', chunk => client.feed(String(chunk)));
@@ -104,7 +105,12 @@ export class FlutterProcessRuntime implements FlutterRuntime {
             this.log(`Flutter server ready (${Date.now() - session.startedAt} ms since start; browser rendering continues separately).\n`);
             this.events.emit({ type: 'STARTED', sessionId: session.id }); break;
           case 'app.log': if (typeof params.log === 'string') this.log(`${params.log}\n`); break;
-          case 'daemon.logMessage': if (typeof params.message === 'string') this.log(`${params.message}\n`); break;
+          case 'daemon.logMessage':
+            if (typeof params.message === 'string') {
+              if (params.level === 'status') this.toolLog(session, params.message);
+              else this.log(`${params.message}\n`);
+            }
+            break;
           case 'app.progress': if (typeof params.message === 'string') this.log(`${params.message}\n`); break;
           case 'app.stop':
             if (!session.cancelled) this.events.emit({ type: 'FATAL', sessionId: session.id, message: 'Flutter application stopped.' });
@@ -120,16 +126,26 @@ export class FlutterProcessRuntime implements FlutterRuntime {
     if (session.closed) return;
     session.closed = true; session.client?.close(); session.resolveExit();
   }
+  private toolLog(session: ProcessSession, text: string): void {
+    // These tool statuses mean compilation did not update a browser client.
+    // Application app.log messages must not select this fallback.
+    if (session.compilation && ['Recompile complete. Page requires refresh.', 'Recompile complete. No client connected.'].includes(text.trim())) session.compilation.requiresBrowserRefresh = true;
+    this.log(text.endsWith('\n') ? text : `${text}\n`);
+  }
   async recompile(id: string, reason: 'save' | 'manual', timeout: number): Promise<CompileResult> {
     const session = this.session;
     if (!session || session.id !== id || session.cancelled || !session.appId || !session.client) throw new Error('Flutter is not ready for updates.');
     const start = Date.now();
-    const result = await session.client.request('app.restart', { appId: session.appId, fullRestart: true, pause: false, reason }, timeout);
+    const compilation = { requiresBrowserRefresh: false };
+    session.compilation = compilation;
+    let result: unknown;
+    try { result = await session.client.request('app.restart', { appId: session.appId, fullRestart: true, pause: false, reason }, timeout); }
+    finally { session.compilation = undefined; }
     const completedAt = Date.now();
     if (!result || typeof result !== 'object' || typeof (result as Record<string, unknown>).code !== 'number') throw new Error('Flutter returned an invalid compilation response.');
     const value = result as Record<string, unknown>;
     this.log(`Compilation ${value.code === 0 ? 'succeeded' : 'failed'} (${Date.now() - start} ms).\n`);
-    return { code: value.code as number, message: typeof value.message === 'string' ? value.message : undefined, completedAt };
+    return { code: value.code as number, message: typeof value.message === 'string' ? value.message : undefined, completedAt, requiresBrowserRefresh: compilation.requiresBrowserRefresh };
   }
   async stop(id: string): Promise<void> {
     const session = this.session;

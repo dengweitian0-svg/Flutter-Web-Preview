@@ -75,7 +75,9 @@ export async function logConsoleTest(): Promise<void> {
   const otherUrl = `http://127.0.0.1:${address.port}/`;
   const replace = async (text: string) => {
     const edit = new vscode.WorkspaceEdit(); edit.replace(file, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)), text);
-    assert(await vscode.workspace.applyEdit(edit)); assert(await document.save());
+    assert(await vscode.workspace.applyEdit(edit));
+    await vscode.window.showTextDocument(document, vscode.ViewColumn.One);
+    assert.equal(await command('saveAndReload'), true);
   };
   const ready = async (nextPhase = phase) => {
     phase = nextPhase;
@@ -171,13 +173,19 @@ export async function logConsoleTest(): Promise<void> {
     const beforeSave = api.getStatus();
     const beforeSaveDocument = await preview!.documentId();
     await replace(original.replace('Preview version 1', 'Preview logs saved'));
-    await until(() => api.getStatus().state === 'failed' || ((api.getStatus().lastCompilation?.operationId ?? 0) > (beforeSave.lastCompilation?.operationId ?? 0) && api.getStatus().refreshCount > beforeSave.refreshCount), 60000);
+    await until(() => api.getStatus().state === 'failed' || ((api.getStatus().lastCompilation?.operationId ?? 0) > (beforeSave.lastCompilation?.operationId ?? 0) && api.getStatus().state === 'running'), 60000);
     assert.equal(api.getStatus().state, 'running', api.getStatus().error);
+    assert.equal(api.getStatus().lastCompilation?.code, 0, api.getStatus().error);
+    const requiresBrowserRefresh = process.env.PREVIEW_EXPECT_BROWSER_REFRESH === '1';
+    assert.equal(api.getStatus().lastCompilation?.requiresBrowserRefresh, requiresBrowserRefresh);
+    if (requiresBrowserRefresh) await until(() => api.getStatus().refreshCount === beforeSave.refreshCount + 1, 5000);
     const savedConnection = { current: preview };
-    try { await waitForText(savedConnection, api.getStatus().url!, 'Preview logs saved', 60000, { previousDocument: beforeSaveDocument }); }
+    try { await waitForText(savedConnection, api.getStatus().url!, 'Preview logs saved', 60000, requiresBrowserRefresh ? { previousDocument: beforeSaveDocument } : { retainedDocument: beforeSaveDocument }); }
     finally { preview = savedConnection.current; }
     await wait(500); await ready('Dart save');
-    assert.equal(vscode.window.activeTextEditor?.document.uri.toString(), file.toString(), 'Save refresh must preserve editor focus');
+    assert.equal(api.getStatus().refreshCount, beforeSave.refreshCount + Number(requiresBrowserRefresh), 'Saved updates must not add a browser refresh');
+    if (!requiresBrowserRefresh) assert.equal(await preview!.documentId(), beforeSaveDocument, 'Dart save must retain the browser document');
+    assert.equal(vscode.window.activeTextEditor?.document.uri.toString(), file.toString(), 'Saved updates must preserve editor focus');
     await emitAndCheck(); assert.equal(ownerToken(), token);
     const beforeRestart = ownedConsole();
     assert.equal(exits(beforeRestart).length, 0, 'Save, reload, and rebind must not emit exit');
