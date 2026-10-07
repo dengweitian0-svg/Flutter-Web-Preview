@@ -2,6 +2,9 @@ node_modules/
 dist/
 .cache/
 .vscode-test/
+.vscode/
+.worktrees/
+docs/
 artifacts/
 *.vsix
 test/fixtures/flutter_app/.dart_tool/
