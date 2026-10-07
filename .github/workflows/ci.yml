@@ -57,9 +57,21 @@ jobs:
           repository: flutter/flutter
           ref: 4e5a09292c1c64a38d604c7ec096537f50d69f93
           path: .cache/f
+          fetch-depth: 300
+          fetch-tags: true
           persist-credentials: false
       - name: Bootstrap Flutter SDK
-        run: '& "$env:FLUTTER_SDK_PATH\bin\flutter.bat" --suppress-analytics --version'
+        shell: pwsh
+        run: |
+          & "$env:FLUTTER_SDK_PATH\bin\flutter.bat" --suppress-analytics --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $versionJson = & "$env:FLUTTER_SDK_PATH\bin\flutter.bat" --suppress-analytics --version --machine
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $flutter = ($versionJson -join "`n") | ConvertFrom-Json
+          if ($flutter.frameworkVersion -ne '3.49.0-1.0.pre-240' -or $flutter.frameworkRevision -ne '4e5a09292c1c64a38d604c7ec096537f50d69f93') {
+            throw "Expected Flutter 3.49.0-1.0.pre-240 at revision 4e5a09292c1c64a38d604c7ec096537f50d69f93, got $($flutter.frameworkVersion) at $($flutter.frameworkRevision)."
+          }
+          Write-Host "Using Flutter $($flutter.frameworkVersion) at revision $($flutter.frameworkRevision)."
       - name: Prepare fixture
         working-directory: test/fixtures/flutter_app
         run: '& "$env:FLUTTER_SDK_PATH\bin\flutter.bat" --suppress-analytics pub get'
